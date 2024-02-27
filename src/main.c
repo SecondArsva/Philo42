@@ -39,7 +39,7 @@ long    simple_atol(char *str)
 void    valid_digit(char **argv)
 {
     int i;
-    int digit;
+    long digit;
 
     i = 1;
     digit = 0;
@@ -135,6 +135,7 @@ int main(int argc, char **argv)
     {
         print_args(argc, argv);
         parse_input(argv);
+        //init_data(&table);
     }
     else
         error("Total de argumentos incorrectos. Han de ser 5 o 6");
