@@ -15,7 +15,7 @@ NAME = philo
 CC = cc -Wall -Wextra -Werror
 RM = rm -rf
 
-SRC = src/main.c
+SRC = src/main.c	\
 
 OBJS = $(SRC:%.c=%.o)
 

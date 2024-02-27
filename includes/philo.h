@@ -21,6 +21,7 @@
 						// threads: create join detach
 # include <limits.h>	// INT_MAX
 # include <errno.h>		// pthreads errors
+#include <stdbool.h>	// for use the bool variable type
 
 // forward declarations
 //typedef s_fork	t_fork;
@@ -30,29 +31,32 @@
 
 typedef pthread_mutex_t t_mutex; // code more redeable
 typedef struct s_philo t_philo;
-// ./philo 5 800 200 200 [5]
-// philo_nbr die eat sleep meals_nbr
 
 typedef struct	s_fork{
 	t_mutex	fork;
 	int		fork_id;
 }				t_fork;
 
+// "tt_" means "time_to_" son "tt_die" its "time_to_die", etc.
 typedef struct	s_table{	// datos globales a falta de poder tener variables globales reales
 	long		philo_nbr;
-	long		time_to_die;
-	long		time_to_eat;
-	long		time_to_sleep;
-	long		meals_nbr;		// [5] | Flag if -1
+	long		tt_die;
+	long		tt_eat;
+	long		tt_sleep;
+	long		must_eat;		// [5] | Flag if -1
+
 	long		sim_start_chrono;	// importante para el timestamp. TODO start_sim_time.
-	int			end_sim_bool; // a philo dies or all philos full;
-	int			all_threads_ready_bool; // synchro philo to start at the same time
+	bool		end_sim; // a philo dies or all philos full;
+	bool		all_threads_ready; // synchro philo to start at the same time
 	long		threads_running_nbr;
-	pthread_t	grimdeath;
+	
 	t_mutex		table_mutex;	// avoid races while reading from table
 	t_mutex		print_mutex;	// For avoid the overlap when printf with threads without use fflush.
-	t_fork		*forks; // array de tenedores;
+	
 	t_philo		*philos; // array de filósofos;
+	t_fork		*forks; // array de tenedores;
+	
+	pthread_t	grimdeath;
 }				t_table;
 
 typedef struct	s_philo{
@@ -79,7 +83,6 @@ typedef enum	e_pthread
 	DESTROY,
 	CREATE,
 	JOIN,
-	DETACH,
 }				t_pthread;
 
 //			### TIME UNITS OPECODE ###
@@ -102,10 +105,14 @@ typedef	enum	e_print
 	SECOND_FORK_TAKED,
 }				t_print;
 
+// #--- STRUCT PRINTER ---#
+typedef enum	e_struct
+{
+	TABLE,
+	PHILO,
+	FORK,
+	ALL,
+}
+
 //			### FUNCTIONS BY FILES ###
-
-//			--- UTILS ---
-void    ft_error(char *text);
-
-
 #endif
