@@ -1,7 +1,6 @@
 #include "../includes/philo.h"
 
 //  ### INDICE ###
-int     main(int argc, char **argv);
 
 // #--- Utilidades ---#
 void    error_exit(char *text);
@@ -75,8 +74,8 @@ void    init_table(int argc, char **argv, t_table *table)
     table->end_sim = false;
     table->all_threads_ready = false;
     table->threads_running_nbr = 0;
-    handle_mutex(&table->table_mutex, CREATE);
-    handle_mutex(&table->print_mutex, CREATE);
+    handle_mutex(&table->table_mutex, INIT);
+    handle_mutex(&table->print_mutex, INIT);
     table->philos = safe_malloc(sizeof(t_philo) * table->philo_nbr);
     table->forks = safe_malloc(sizeof(t_fork) * table->philo_nbr);
 }
@@ -84,7 +83,7 @@ void    init_table(int argc, char **argv, t_table *table)
 void    init_data(int argc, char **argv, t_table *table)
 {
     init_table(argc, argv, table);
-    printf("UwU\n");
+    correct("post init_table");
     //init_forks(table);
     //init_philos(table);
     // vas por aquí!!!!!!!!!!!!!!!!!!

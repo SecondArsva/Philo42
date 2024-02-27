@@ -112,7 +112,7 @@ typedef enum	e_struct
 	PHILO,
 	FORK,
 	ALL,
-}
+}				t_struct;
 
 //			### FUNCTIONS BY FILES ###
 #endif
