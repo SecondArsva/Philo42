@@ -18,8 +18,8 @@ void    valid_digit(char **argv);
 void    init_data(int argc, char **argv, t_table *table);
 void    init_table(int argc, char **argv, t_table *table);
 void    catch_args(int argc, char **argv, t_table *table);
-//void    init_forks(t_table *table);
-//void    init_philos(t_table *table);
+void    init_forks(t_table *table);
+void    init_philos(t_table *table);
 
 
 // #--- Wrapped Handle Functions ---#
@@ -80,11 +80,51 @@ void    init_table(int argc, char **argv, t_table *table)
     table->forks = safe_malloc(sizeof(t_fork) * table->philo_nbr);
 }
 
+void    init_forks(t_table *table)
+{
+    int     i;
+    t_fork *forks_array;
+
+    i = 0;
+    forks_array = table->forks;
+    while (i < table->philo_nbr)
+    {
+        handle_mutex(&forks_array[i].fork, INIT);
+        forks_array[i].fork_id = i;
+        i++;
+    }
+}
+/*
+void    inti_philos(t_table *table)
+{
+    int     i;
+    t_philo *philos_array;
+
+    i = 0;
+    philos_array = table->philos;
+    while(i < table->philo_nbr)
+    {
+        philos_array[i].id = i + 1;
+        philos_array[i].meals_counter = 0;
+        philos_array[i].full = false;
+        philos_array[i].last_meal_time = 0;
+        // asignar tenedores correctamente
+        philos_array[i].first_fork = NULL;
+        philos_array[i].second_fork = NULL;
+        // crear el hilo philos_array[i].thread_id falta handle_thread
+        handle_mutex(&philos_array[i].philo_mutex, INIT);
+        philos_array[i].table = table;
+        i++;
+    }
+}
+*/
+
 void    init_data(int argc, char **argv, t_table *table)
 {
     init_table(argc, argv, table);
     correct("post init_table");
-    //init_forks(table);
+    init_forks(table);
+    correct("post init_forks");
     //init_philos(table);
     // vas por aquí!!!!!!!!!!!!!!!!!!
 }

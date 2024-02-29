@@ -60,15 +60,15 @@ typedef struct	s_table{	// datos globales a falta de poder tener variables globa
 }				t_table;
 
 typedef struct	s_philo{
-	int			id;				// identificador
+	int			id;				// identificador - del 1 en adelante
 	long		meals_counter;	// veces que ha comido
-	int			full_bool;		// flag que determina que ha terminado de comer
+	bool		full;		// flag que determina que ha terminado de comer
 	long		last_meal_time;	// tiempo transcurrido desde la última vez que comió
 	t_fork		*first_fork;
 	t_fork		*second_fork;
 	pthread_t	thread_id;		// a philo is a thread
 	t_mutex		philo_mutex;	// usefull for races with grim monitor
-	t_table		*table;
+	t_table		*table;	// puntero a la mesa para trabajar con los datos globales
 }				t_philo;
 
 // Enum OPCODE for the wrapper handle functions for more
