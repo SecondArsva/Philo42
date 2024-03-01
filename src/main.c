@@ -7,6 +7,8 @@ void    error_exit(char *text);
 void    correct(char *text);
 long    simple_atol(char *str);
 void    *safe_malloc(size_t bytes);
+void    print_assigned_forks(t_table *table);
+void    print_forks(t_table *table, t_fork *forks);
 
 // #--- Parseo ---#      Listo, no toques nada del parseo.
 void    parse_input(char **argv);
@@ -20,7 +22,9 @@ void    init_table(int argc, char **argv, t_table *table);
 void    catch_args(int argc, char **argv, t_table *table);
 void    init_forks(t_table *table);
 void    init_philos(t_table *table);
-
+void    assign_forks(t_table *table, t_philo *philo, t_fork *forks, int i);
+void    to_lone_philo(t_philo *philo, t_fork *forks);
+void    to_multiple_philos(t_philo *philo, t_fork *forks, int position);
 
 // #--- Wrapped Handle Functions ---#
 void    handle_mutex(t_mutex *mutex, t_pthread opcode);
@@ -94,8 +98,42 @@ void    init_forks(t_table *table)
         i++;
     }
 }
-/*
-void    inti_philos(t_table *table)
+
+void    to_multiple_philos(t_philo *philo, t_fork *forks, int position)
+{
+    int philo_nbr;
+
+    philo_nbr = philo->table->philo_nbr;
+    if (position == philo_nbr - 1)
+    {
+        *philo->first_fork = forks[position];
+        *philo->second_fork = forks[position - (philo_nbr + 1)];
+    }
+    else
+    {
+        *philo->first_fork = forks[position];
+        *philo->second_fork = forks[position + 1];
+    }
+}
+
+void    to_lone_philo(t_philo *philo, t_fork *forks)
+{
+    philo->first_fork = &forks[0];
+}
+
+void    assign_forks(t_table *table, t_philo *philo, t_fork *forks, int i)
+{
+    printf("Llega aquí\n");
+    if (table->philo_nbr == 1) // No va a partir de aquí...
+    {
+        printf("Aquí no llega\n");
+        to_lone_philo(philo, forks);
+    }
+    else
+        to_multiple_philos(philo, forks, i);
+}
+
+void    init_philos(t_table *table)
 {
     int     i;
     t_philo *philos_array;
@@ -105,27 +143,57 @@ void    inti_philos(t_table *table)
     while(i < table->philo_nbr)
     {
         philos_array[i].id = i + 1;
+        philos_array[i].alive = true;
         philos_array[i].meals_counter = 0;
         philos_array[i].full = false;
         philos_array[i].last_meal_time = 0;
-        // asignar tenedores correctamente
-        philos_array[i].first_fork = NULL;
-        philos_array[i].second_fork = NULL;
-        // crear el hilo philos_array[i].thread_id falta handle_thread
-        handle_mutex(&philos_array[i].philo_mutex, INIT);
+        handle_mutex(&philos_array[i].philo_mutex, INIT); // pincho duda, ¿lleva paréntesis? Él dice que sí.
         philos_array[i].table = table;
+        assign_forks(table, &philos_array[i], table->forks, i);   // pincho duda, ¿lleva paréntesis? Él dice que sí.
         i++;
     }
 }
-*/
+
+void    print_assigned_forks(t_table *table)
+{
+    int i;
+
+    i = 0;
+    if (table->philo_nbr == 1)
+        printf("philo[%i] fork_id: %i\n", i, table->philos[i].first_fork->fork_id);
+    else
+    {
+        while (i < table->philo_nbr)
+        {
+            printf("philo[%i] first fork_id: %i\n", i, table->philos[i].first_fork->fork_id);
+            printf("philo[%i] second fork_id: %i\n", i, table->philos[i].second_fork->fork_id);
+            i++;
+        }
+    }
+}
+
+void    print_forks(t_table *table, t_fork *forks)
+{
+    int i = 0;
+    
+    while (i < table->philo_nbr)
+    {
+        printf("fork %i: %i\n", i, forks[i].fork_id);
+        i++;
+    }
+}
 
 void    init_data(int argc, char **argv, t_table *table)
 {
     init_table(argc, argv, table);
     correct("post init_table");
+    printf("Número de philos: %li\n", table->philo_nbr);
     init_forks(table);
     correct("post init_forks");
-    //init_philos(table);
+    print_forks(table, table->forks);
+    init_philos(table);
+    correct("ni idea de si se han asignado bien los tenedores");
+    print_assigned_forks(table);
     // vas por aquí!!!!!!!!!!!!!!!!!!
 }
 

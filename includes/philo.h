@@ -60,13 +60,14 @@ typedef struct	s_table{	// datos globales a falta de poder tener variables globa
 }				t_table;
 
 typedef struct	s_philo{
+	pthread_t	thread_id;		// id for the thread, a philo is a thread.
 	int			id;				// identificador - del 1 en adelante
+	bool		alive;		// controla si el hilo está vivo o muerto
 	long		meals_counter;	// veces que ha comido
 	bool		full;		// flag que determina que ha terminado de comer
 	long		last_meal_time;	// tiempo transcurrido desde la última vez que comió
 	t_fork		*first_fork;
 	t_fork		*second_fork;
-	pthread_t	thread_id;		// a philo is a thread
 	t_mutex		philo_mutex;	// usefull for races with grim monitor
 	t_table		*table;	// puntero a la mesa para trabajar con los datos globales
 }				t_philo;
