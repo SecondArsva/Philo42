@@ -9,6 +9,7 @@ long    simple_atol(char *str);
 void    *safe_malloc(size_t bytes);
 void    print_assigned_forks(t_table *table);
 void    print_forks(t_table *table, t_fork *forks);
+void    print_philos(t_table *table, t_philo *philos);
 
 // #--- Parseo ---#      Listo, no toques nada del parseo.
 void    parse_input(char **argv);
@@ -22,7 +23,7 @@ void    init_table(int argc, char **argv, t_table *table);
 void    catch_args(int argc, char **argv, t_table *table);
 void    init_forks(t_table *table);
 void    init_philos(t_table *table);
-void    assign_forks(t_table *table, t_philo *philo, t_fork *forks, int i);
+void    assign_forks(long philo_nbr, t_philo *philo, t_fork *forks, int i);
 void    to_lone_philo(t_philo *philo, t_fork *forks);
 void    to_multiple_philos(t_philo *philo, t_fork *forks, int position);
 
@@ -99,20 +100,22 @@ void    init_forks(t_table *table)
     }
 }
 
-void    to_multiple_philos(t_philo *philo, t_fork *forks, int position)
+void    to_tons_philos(long philo_nbr, t_philo *philo, t_fork *forks, int i)
 {
-    int philo_nbr;
+    int position;
+    int last_philo;
 
-    philo_nbr = philo->table->philo_nbr;
-    if (position == philo_nbr - 1)
+    position = i;
+    last_philo = philo_nbr - 1;
+    if (position == last_philo) // algo aquí creo no está bien. Revisa los punteros de los tenedores.
     {
-        *philo->first_fork = forks[position];
-        *philo->second_fork = forks[position - (philo_nbr + 1)];
+        philo->first_fork = &forks[position];
+        philo->second_fork = &forks[position - (philo_nbr + 1)];
     }
     else
     {
-        *philo->first_fork = forks[position];
-        *philo->second_fork = forks[position + 1];
+        philo->first_fork = &forks[position];
+        philo->second_fork = &forks[position + 1];
     }
 }
 
@@ -121,16 +124,12 @@ void    to_lone_philo(t_philo *philo, t_fork *forks)
     philo->first_fork = &forks[0];
 }
 
-void    assign_forks(t_table *table, t_philo *philo, t_fork *forks, int i)
+void    assign_forks(long philo_nbr, t_philo *philo, t_fork *forks, int i)
 {
-    printf("Llega aquí\n");
-    if (table->philo_nbr == 1) // No va a partir de aquí...
-    {
-        printf("Aquí no llega\n");
+    if (philo_nbr == 1) // No va a partir de aquí...
         to_lone_philo(philo, forks);
-    }
     else
-        to_multiple_philos(philo, forks, i);
+        to_tons_philos(philo_nbr, philo, forks, i);
 }
 
 void    init_philos(t_table *table)
@@ -147,9 +146,9 @@ void    init_philos(t_table *table)
         philos_array[i].meals_counter = 0;
         philos_array[i].full = false;
         philos_array[i].last_meal_time = 0;
-        handle_mutex(&philos_array[i].philo_mutex, INIT); // pincho duda, ¿lleva paréntesis? Él dice que sí.
+        handle_mutex(&philos_array[i].philo_mutex, INIT);
         philos_array[i].table = table;
-        assign_forks(table, &philos_array[i], table->forks, i);   // pincho duda, ¿lleva paréntesis? Él dice que sí.
+        assign_forks(table->philo_nbr, &philos_array[i], table->forks, i);
         i++;
     }
 }
@@ -178,7 +177,27 @@ void    print_forks(t_table *table, t_fork *forks)
     
     while (i < table->philo_nbr)
     {
-        printf("fork %i: %i\n", i, forks[i].fork_id);
+        printf("- fork[%i]\n - fork_id: %i\n", i, forks[i].fork_id);
+        printf("\n");
+        i++;
+    }
+}
+
+void    print_philos(t_table *table, t_philo *philos)
+{
+    int i = 0;
+    while (i < table->philo_nbr)
+    {
+        printf("- philos[%i]\n", i);
+        printf(" - id:              %i\n", philos[i].id);
+        printf(" - alive:           %i\n", philos[i].alive);
+        printf(" - full:            %i\n", philos[i].full);
+        printf(" - meals_counter:   %li\n", philos[i].meals_counter);
+        printf(" - last_meal_time:  %li\n", philos[i].last_meal_time);
+        printf(" - table pointer:   %p\n", philos[i].table);
+        printf(" - frist_fork:      %p\n", philos[i].first_fork);
+        printf(" - second_fork:     %p\n", philos[i].second_fork);
+        printf("\n");
         i++;
     }
 }
@@ -192,7 +211,7 @@ void    init_data(int argc, char **argv, t_table *table)
     correct("post init_forks");
     print_forks(table, table->forks);
     init_philos(table);
-    correct("ni idea de si se han asignado bien los tenedores");
+    print_philos(table, table->philos);
     print_assigned_forks(table);
     // vas por aquí!!!!!!!!!!!!!!!!!!
 }
