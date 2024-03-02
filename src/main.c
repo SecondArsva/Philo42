@@ -10,6 +10,8 @@ void    *safe_malloc(size_t bytes);
 void    print_assigned_forks(t_table *table);
 void    print_forks(t_table *table, t_fork *forks);
 void    print_philos(t_table *table, t_philo *philos);
+void    print_table(t_table *table);
+void    print_data(t_table *table);
 
 // #--- Parseo ---#      Listo, no toques nada del parseo.
 void    parse_input(char **argv);
@@ -30,8 +32,34 @@ void    to_multiple_philos(t_philo *philo, t_fork *forks, int position);
 // #--- Wrapped Handle Functions ---#
 void    handle_mutex(t_mutex *mutex, t_pthread opcode);
 //void    handle_threads(pthread_t *thread, t_pthread opcode);
+//long  get_time(t_time_units opcode)
 
 // #--- Getter Setters with Security Mutex ---#
+
+void    print_table(t_table *table)
+{
+    printf("\n- table\n");
+    printf(" - philo_nbr: %li\n", table->philo_nbr);
+    printf(" - tt_die: %li\n", table->tt_die);
+    printf(" - tt_eat: %li\n", table->tt_eat);
+    printf(" - tt_sleep: %li\n", table->tt_sleep);
+    printf(" - must_eat: %li\n", table->must_eat);
+    printf(" - sim_start_chrono: %li\n", table->sim_start_chrono);
+    printf(" - end_sim: %i\n", table->end_sim);
+    printf(" - all_threads_ready: %i\n", table->all_threads_ready);
+    printf(" - threads_running_nbr: %li\n", table->threads_running_nbr);
+
+    //printf(" - : %li\n", table->);
+    printf("\n");
+}
+
+void    print_data(t_table *table)
+{
+        print_table(table);
+        print_forks(table, table->forks);
+        print_philos(table, table->philos);
+        print_assigned_forks(table);
+}
 
 void    handle_mutex(t_mutex *mutex, t_pthread opcode)
 {
@@ -100,6 +128,8 @@ void    init_forks(t_table *table)
     }
 }
 
+// Cogen tenedores según su posición relativa y despues la posición relativa + 1
+// En caso de ser el último filósofo, coge el último y primer tenedor.
 void    to_tons_philos(long philo_nbr, t_philo *philo, t_fork *forks, int i)
 {
     int position;
@@ -107,7 +137,7 @@ void    to_tons_philos(long philo_nbr, t_philo *philo, t_fork *forks, int i)
 
     position = i;
     last_philo = philo_nbr - 1;
-    if (position == last_philo) // algo aquí creo no está bien. Revisa los punteros de los tenedores.
+    if (position == last_philo)
     {
         philo->first_fork = &forks[position];
         philo->second_fork = &forks[position - (philo_nbr + 1)];
@@ -126,7 +156,7 @@ void    to_lone_philo(t_philo *philo, t_fork *forks)
 
 void    assign_forks(long philo_nbr, t_philo *philo, t_fork *forks, int i)
 {
-    if (philo_nbr == 1) // No va a partir de aquí...
+    if (philo_nbr == 1)
         to_lone_philo(philo, forks);
     else
         to_tons_philos(philo_nbr, philo, forks, i);
@@ -158,17 +188,19 @@ void    print_assigned_forks(t_table *table)
     int i;
 
     i = 0;
+    printf("- assigned_forks\n");
     if (table->philo_nbr == 1)
-        printf("philo[%i] fork_id: %i\n", i, table->philos[i].first_fork->fork_id);
+        printf(" - philo[%i] fork_id: %i\n", i, table->philos[i].first_fork->fork_id);
     else
     {
         while (i < table->philo_nbr)
         {
-            printf("philo[%i] first fork_id: %i\n", i, table->philos[i].first_fork->fork_id);
-            printf("philo[%i] second fork_id: %i\n", i, table->philos[i].second_fork->fork_id);
+            printf(" - philo[%i] first fork_id:     %i\n", i, table->philos[i].first_fork->fork_id);
+            printf(" - philo[%i] second fork_id:    %i\n", i, table->philos[i].second_fork->fork_id);
             i++;
         }
     }
+    printf("\n");
 }
 
 void    print_forks(t_table *table, t_fork *forks)
@@ -195,7 +227,7 @@ void    print_philos(t_table *table, t_philo *philos)
         printf(" - meals_counter:   %li\n", philos[i].meals_counter);
         printf(" - last_meal_time:  %li\n", philos[i].last_meal_time);
         printf(" - table pointer:   %p\n", philos[i].table);
-        printf(" - frist_fork:      %p\n", philos[i].first_fork);
+        printf(" - first_fork:      %p\n", philos[i].first_fork);
         printf(" - second_fork:     %p\n", philos[i].second_fork);
         printf("\n");
         i++;
@@ -205,15 +237,8 @@ void    print_philos(t_table *table, t_philo *philos)
 void    init_data(int argc, char **argv, t_table *table)
 {
     init_table(argc, argv, table);
-    correct("post init_table");
-    printf("Número de philos: %li\n", table->philo_nbr);
     init_forks(table);
-    correct("post init_forks");
-    print_forks(table, table->forks);
     init_philos(table);
-    print_philos(table, table->philos);
-    print_assigned_forks(table);
-    // vas por aquí!!!!!!!!!!!!!!!!!!
 }
 
 void    *safe_malloc(size_t size)
@@ -350,6 +375,8 @@ int main(int argc, char **argv)
         parse_input(argv);
         table = safe_malloc(sizeof(t_table) * 1);
         init_data(argc, argv, table);
+        print_data(table);
+        // simulation(table); Crear simulación. Diseñar como iría. Crear hilos comensales y segador.
     }
     else
         error_exit("Total de argumentos incorrectos. Han de ser 5 o 6");
