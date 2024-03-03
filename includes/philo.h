@@ -60,8 +60,8 @@ typedef struct	s_table{	// datos globales a falta de poder tener variables globa
 }				t_table;
 
 typedef struct	s_philo{
-	pthread_t	thread_id;		// id for the thread, a philo is a thread.
-	int			id;				// identificador - del 1 en adelante
+	pthread_t	thread;		// id for the thread, a philo is a thread. The thread...
+	long		id;				// identificador - del 1 en adelante
 	bool		alive;		// controla si el hilo está vivo o muerto
 	long		meals_counter;	// veces que ha comido
 	bool		full;		// flag que determina que ha terminado de comer
@@ -105,15 +105,6 @@ typedef	enum	e_print
 	FIRST_FORK_TAKED,
 	SECOND_FORK_TAKED,
 }				t_print;
-
-// #--- STRUCT PRINTER ---#
-typedef enum	e_struct
-{
-	TABLE,
-	PHILO,
-	FORK,
-	ALL,
-}				t_struct;
 
 //			### FUNCTIONS BY FILES ###
 #endif

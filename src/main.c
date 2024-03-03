@@ -19,7 +19,7 @@ void    all_digit(char **argv);
 int     is_digit(char c);
 void    valid_digit(char **argv);
 
-// #--- Inicialización de datos ---# Estoy con esto...
+// #--- Inicialización de datos ---# Listo, no toques nada de la inicialización.
 void    init_data(int argc, char **argv, t_table *table);
 void    init_table(int argc, char **argv, t_table *table);
 void    catch_args(int argc, char **argv, t_table *table);
@@ -29,12 +29,136 @@ void    assign_forks(long philo_nbr, t_philo *philo, t_fork *forks, int i);
 void    to_lone_philo(t_philo *philo, t_fork *forks);
 void    to_multiple_philos(t_philo *philo, t_fork *forks, int position);
 
+// #--- Simulación ---# Estoy con esto...
+void    simulation(t_table *table);
+void    *lone_philo_routine(void *arg);
+void    *tons_philos_routine(void *arg);
+void    *reaper_routine(void *arg); // while !end_sim siempre
+void    *test_routine(void *arg);
+void    create_philos(t_table *table);
+void    create_reaper(t_table *table);
+void    wait_philos(t_table *table);
+
 // #--- Wrapped Handle Functions ---#
 void    handle_mutex(t_mutex *mutex, t_pthread opcode);
-//void    handle_threads(pthread_t *thread, t_pthread opcode);
+void    handle_threads(pthread_t *th, void *(*routine)(void *), void *arg, t_pthread opcode);
 //long  get_time(t_time_units opcode)
 
 // #--- Getter Setters with Security Mutex ---#
+bool    get_bool(t_mutex *mutex, bool value);
+long    get_long(t_mutex *mutex, long value);
+void    set_bool(t_mutex *mutex, bool *dest, bool new_value);
+void    set_long(t_mutex *mutex, long *dest, long new_value);
+void    increase_long(t_mutex *mutex, long *dest);
+void    print_secured(t_mutex *mutex, char *text);
+
+/*void    print_secured(t_mutex *t_mutex, char *text)
+{
+
+}*/
+
+void    *test_routine(void *arg)
+{
+    t_philo *philo;
+
+    philo = (t_philo *)arg;
+    set_bool(&philo->philo_mutex, &philo->alive, true);
+    handle_mutex(&philo->table->print_mutex, LOCK);
+    printf("\nHilo creado. Identificador:  %li\n", philo->id);
+    printf("Hola, soy el comensal número %li y... ¿estoy vivo?\nphilo[%li]->alive = %i\n", philo->id, philo->id - 1, get_bool(&philo->philo_mutex, philo->alive));
+    handle_mutex(&philo->table->print_mutex, UNLOCK);
+    return (NULL);
+}
+
+void    create_philos(t_table *table)
+{
+    int i;
+    t_philo *philo;
+
+    i = 0;
+    philo = table->philos;
+    while (i < table->philo_nbr)
+    {
+        handle_threads(&philo[i].thread, test_routine, &philo[i], CREATE);
+        i++;
+    }
+}
+
+void    wait_philos(t_table *table)
+{
+    int i;
+    t_philo *philo;
+
+    i = 0;
+    philo = table->philos;
+    while (i < table->philo_nbr)
+    {
+        handle_threads(&philo[i].thread, NULL, NULL, JOIN);
+        i++;
+    }
+}
+
+void    simulation(t_table *table)
+{
+    printf("\n --- [SIMULATION] ---\n");
+    // Crear hilos comensales
+    create_philos(table);
+    // Crear hilo segador
+    // pistoletazo de salida
+    // Esperar a los hilos
+    wait_philos(table);
+}
+
+void    handle_threads(pthread_t *th, void *(*routine)(void *), void *arg, t_pthread opcode)
+{
+    if (opcode == CREATE)
+        pthread_create(th, NULL, routine, arg);
+    else if (opcode == JOIN)
+        pthread_join(*th, NULL);
+    else
+        error_exit("Wrong opcode on handle_threads function");
+}
+
+bool    get_bool(t_mutex *mutex, bool value)
+{
+    bool    ret_bool;
+
+    handle_mutex(mutex, LOCK);
+    ret_bool = value;
+    handle_mutex(mutex, UNLOCK);
+    return (ret_bool);
+}
+
+long    get_long(t_mutex *mutex, long value)
+{
+    long    ret_long;
+
+    handle_mutex(mutex, LOCK);
+    ret_long = value;
+    handle_mutex(mutex, UNLOCK);
+    return (ret_long);
+}
+
+void    set_bool(t_mutex *mutex, bool *dest, bool new_value)
+{
+    handle_mutex(mutex, LOCK);
+    *dest = new_value;
+    handle_mutex(mutex, UNLOCK);
+}
+
+void    set_long(t_mutex *mutex, long *dest, long new_value)
+{
+    handle_mutex(mutex, LOCK);
+    *dest = new_value;
+    handle_mutex(mutex, UNLOCK);
+}
+
+void    increase_long(t_mutex *mutex, long *dest)
+{
+    handle_mutex(mutex, LOCK);
+    dest++;
+    handle_mutex(mutex, LOCK);
+}
 
 void    print_table(t_table *table)
 {
@@ -221,7 +345,7 @@ void    print_philos(t_table *table, t_philo *philos)
     while (i < table->philo_nbr)
     {
         printf("- philos[%i]\n", i);
-        printf(" - id:              %i\n", philos[i].id);
+        printf(" - id:              %li\n", philos[i].id);
         printf(" - alive:           %i\n", philos[i].alive);
         printf(" - full:            %i\n", philos[i].full);
         printf(" - meals_counter:   %li\n", philos[i].meals_counter);
@@ -375,8 +499,8 @@ int main(int argc, char **argv)
         parse_input(argv);
         table = safe_malloc(sizeof(t_table) * 1);
         init_data(argc, argv, table);
-        print_data(table);
-        // simulation(table); Crear simulación. Diseñar como iría. Crear hilos comensales y segador.
+        //print_data(table);
+        simulation(table); // Crear simulación. Diseñar como iría. Crear hilos comensales y segador.
     }
     else
         error_exit("Total de argumentos incorrectos. Han de ser 5 o 6");
