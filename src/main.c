@@ -3,6 +3,7 @@
 //  ### INDICE ###
 
 // #--- Utilidades ---#
+
 void    error_exit(char *text);
 void    correct(char *text);
 long    simple_atol(char *str);
@@ -14,12 +15,14 @@ void    print_table(t_table *table);
 void    print_data(t_table *table);
 
 // #--- Parseo ---#      Listo, no toques nada del parseo.
+
 void    parse_input(char **argv);
 void    all_digit(char **argv);
 int     is_digit(char c);
 void    valid_digit(char **argv);
 
 // #--- Inicialización de datos ---# Listo, no toques nada de la inicialización.
+
 void    init_data(int argc, char **argv, t_table *table);
 void    init_table(int argc, char **argv, t_table *table);
 void    catch_args(int argc, char **argv, t_table *table);
@@ -30,32 +33,56 @@ void    to_lone_philo(t_philo *philo, t_fork *forks);
 void    to_multiple_philos(t_philo *philo, t_fork *forks, int position);
 
 // #--- Simulación ---# Estoy con esto...
+
 void    simulation(t_table *table);
 void    *lone_philo_routine(void *arg);
 void    *tons_philos_routine(void *arg);
-void    *reaper_routine(void *arg); // while !end_sim siempre
+void    *reaper_routine(void *arg); // while !ended_sim siempre
 void    *test_routine(void *arg);
 void    create_philos(t_table *table);
+void    wait_all_philos(t_table *table);
+void    all_philos_ready(t_table *table);
 void    create_reaper(t_table *table);
-void    wait_philos(t_table *table);
+void    check_philos(t_table *table);
+void    print_death(t_table *table, long death_time, t_philo *dead_philo);
+void    kill_em_all(t_table *table);
+void    join_philos(t_table *table);
+void    sim_dinner();
+void    sim_eat();
+void    sim_sleep();
+void    sim_think();
 
 // #--- Wrapped Handle Functions ---#
+
 void    handle_mutex(t_mutex *mutex, t_pthread opcode);
 void    handle_threads(pthread_t *th, void *(*routine)(void *), void *arg, t_pthread opcode);
-//long  get_time(t_time_units opcode)
+long    get_time(t_time_units opcode);
+void    print_action(t_philo *philo, t_print opcode);
 
 // #--- Getter Setters with Security Mutex ---#
+
 bool    get_bool(t_mutex *mutex, bool value);
 long    get_long(t_mutex *mutex, long value);
 void    set_bool(t_mutex *mutex, bool *dest, bool new_value);
 void    set_long(t_mutex *mutex, long *dest, long new_value);
-void    increase_long(t_mutex *mutex, long *dest);
-void    print_secured(t_mutex *mutex, char *text);
+void    increase_long(t_mutex *mutex, long *dest); // Va mal
 
-/*void    print_secured(t_mutex *t_mutex, char *text)
+long    get_time(t_time_units opcode)
 {
+    struct timeval tv;
 
-}*/
+    if (gettimeofday(&tv, NULL) == -1)
+		error_exit("Gettimeofday failed");
+    if (opcode == SECONDS)
+        return (tv.tv_sec + tv.tv_usec / 1e6);
+    else if(opcode == MICROSECONDS)
+        return (tv.tv_sec * 1e3 + tv.tv_usec);
+    else if (opcode == MILLISECONDS)
+        return (tv.tv_sec * 1e6 + tv.tv_usec * 1e3);
+    else
+        error_exit("Wrong opcode on get_time function");
+    return ((long)"fool_return");
+}
 
 void    *test_routine(void *arg)
 {
@@ -63,11 +90,20 @@ void    *test_routine(void *arg)
 
     philo = (t_philo *)arg;
     set_bool(&philo->philo_mutex, &philo->alive, true);
+
     handle_mutex(&philo->table->print_mutex, LOCK);
     printf("\nHilo creado. Identificador:  %li\n", philo->id);
     printf("Hola, soy el comensal número %li y... ¿estoy vivo?\nphilo[%li]->alive = %i\n", philo->id, philo->id - 1, get_bool(&philo->philo_mutex, philo->alive));
     handle_mutex(&philo->table->print_mutex, UNLOCK);
+    usleep(2);
+    wait_all_philos(philo->table);
     return (NULL);
+}
+
+void    wait_all_philos(t_table *table)
+{
+    while (!table->all_threads_ready)
+        ;
 }
 
 void    create_philos(t_table *table)
@@ -80,11 +116,13 @@ void    create_philos(t_table *table)
     while (i < table->philo_nbr)
     {
         handle_threads(&philo[i].thread, test_routine, &philo[i], CREATE);
+        table->threads_running_nbr++;
         i++;
     }
+    printf("Total de hilos corriendo: %li   [x][x][x][x] [x][x][x][x] [x][x][x][x] [x][x][x][x] \n", table->threads_running_nbr);
 }
 
-void    wait_philos(t_table *table)
+void    join_philos(t_table *table)
 {
     int i;
     t_philo *philo;
@@ -98,15 +136,89 @@ void    wait_philos(t_table *table)
     }
 }
 
+// Esperar a que todos los hilos se creen y "notificarlo" actualizando all_threads_ready. Los comensales han llegado.
+// Además se encapsula el pistoletazo de salida como inicio de la simulacion
+void    all_philos_ready(t_table *table)
+{
+    while (table->threads_running_nbr != table->philo_nbr)
+        ;
+    table->sim_start_chrono = get_time(MILLISECONDS);
+    table->all_threads_ready = true;
+}
+
+void    print_death(t_table *table, long death_time, t_philo *dead_philo)
+{
+    handle_mutex(&table->print_mutex, LOCK);
+    printf("%li - %li died\n", death_time, dead_philo->id);
+    handle_mutex(&table->print_mutex, UNLOCK);
+}
+
+void    kill_em_all(t_table *table)
+{
+    int i;
+    t_philo *philo;
+
+    i = 0;
+    philo = table->philos;
+    while(i < table->philo_nbr)  
+    {
+        philo[i].alive = 0;
+        i++;
+    }
+}
+
+void    check_philos(t_table *table)
+{
+    int     i;
+    long    death_time;
+    t_philo *philo;
+
+    i = 0;
+    death_time = 0;
+    philo = table->philos;
+    while (!table->ended_sim && table->all_threads_ready)
+    {
+        while (!table->ended_sim && i < table->philo_nbr)
+        {
+            if (get_time(MILLISECONDS) - philo[i].last_meal_time >= table->tt_die)
+            {
+                death_time = get_time(MILLISECONDS) - table->sim_start_chrono;
+                print_death(table, death_time, &philo[i]);
+                table->ended_sim = true;
+                kill_em_all(table);
+            }
+            i++;
+        }
+        i = 0;
+    }
+}
+
+void    *reaper_routine(void *arg)
+{
+    t_table *table;
+
+    table = (t_table *)arg;
+    all_philos_ready(table);
+    check_philos(table);
+    return (NULL);
+}
+
+void    create_reaper(t_table *table)
+{
+    handle_threads(&table->reaper, reaper_routine, table, CREATE);
+}
+
 void    simulation(t_table *table)
 {
     printf("\n --- [SIMULATION] ---\n");
     // Crear hilos comensales
     create_philos(table);
     // Crear hilo segador
+    create_reaper(table);
     // pistoletazo de salida
-    // Esperar a los hilos
-    wait_philos(table);
+
+    // Esperar a los hilos terminen su rutina con join
+    join_philos(table);
 }
 
 void    handle_threads(pthread_t *th, void *(*routine)(void *), void *arg, t_pthread opcode)
@@ -148,6 +260,7 @@ void    set_bool(t_mutex *mutex, bool *dest, bool new_value)
 
 void    set_long(t_mutex *mutex, long *dest, long new_value)
 {
+    printf("hola\n");
     handle_mutex(mutex, LOCK);
     *dest = new_value;
     handle_mutex(mutex, UNLOCK);
@@ -169,7 +282,7 @@ void    print_table(t_table *table)
     printf(" - tt_sleep: %li\n", table->tt_sleep);
     printf(" - must_eat: %li\n", table->must_eat);
     printf(" - sim_start_chrono: %li\n", table->sim_start_chrono);
-    printf(" - end_sim: %i\n", table->end_sim);
+    printf(" - ended_sim: %i\n", table->ended_sim);
     printf(" - all_threads_ready: %i\n", table->all_threads_ready);
     printf(" - threads_running_nbr: %li\n", table->threads_running_nbr);
 
@@ -228,7 +341,7 @@ void    init_table(int argc, char **argv, t_table *table)
 {
     catch_args(argc, argv, table);
     table->sim_start_chrono = 0;
-    table->end_sim = false;
+    table->ended_sim = false;
     table->all_threads_ready = false;
     table->threads_running_nbr = 0;
     handle_mutex(&table->table_mutex, INIT);

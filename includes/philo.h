@@ -45,8 +45,8 @@ typedef struct	s_table{	// datos globales a falta de poder tener variables globa
 	long		tt_sleep;
 	long		must_eat;		// [5] | Flag if -1
 
-	long		sim_start_chrono;	// importante para el timestamp. TODO start_sim_time.
-	bool		end_sim; // a philo dies or all philos full;
+	long		sim_start_chrono;	// importante para el timestamp. TODO start_sim_time. Inicio de la simulación.
+	bool		ended_sim; // a philo dies or all philos full;
 	bool		all_threads_ready; // synchro philo to start at the same time
 	long		threads_running_nbr;
 	
@@ -56,7 +56,7 @@ typedef struct	s_table{	// datos globales a falta de poder tener variables globa
 	t_philo		*philos; // array de filósofos;
 	t_fork		*forks; // array de tenedores;
 	
-	pthread_t	grimdeath;
+	pthread_t	reaper;
 }				t_table;
 
 typedef struct	s_philo{
