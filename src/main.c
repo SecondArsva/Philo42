@@ -48,8 +48,8 @@ void    print_death(t_table *table, long death_time, t_philo *dead_philo);
 void    kill_em_all(t_table *table);
 void    join_philos(t_table *table);
 void    sim_dinner();
-void    sim_eat();
-void    sim_sleep();
+void    sim_eat(t_philo *philo);
+void    sim_sleep(t_philo *philo);
 void    sim_think();
 
 // #--- Wrapped Handle Functions ---#
@@ -106,6 +106,48 @@ void    wait_all_philos(t_table *table)
         ;
 }
 
+void    sim_eat(t_philo *philo)
+{
+    if (philo->alive)
+    {
+        handle_mutex(&philo->table->print_mutex, LOCK);
+        printf("%li - %li is eating\n", get_time(MILLISECONDS) - philo->table->sim_start_chrono, philo->id);
+        handle_mutex(&philo->table->print_mutex, UNLOCK);
+    }
+    if (philo->alive)
+        usleep(philo->table->tt_eat / 1e3);
+    if (philo->alive)
+        set_long(&philo->philo_mutex, &philo->last_meal_time, get_time(MILLISECONDS));
+    if (philo->table->must_eat != -1)
+        set_long(&philo->philo_mutex, &philo->meals_counter, philo->meals_counter + 1);
+    if (philo->meals_counter == philo->table->must_eat)
+        set_bool(&philo->philo_mutex, &philo->full, true);
+}
+/*
+void    sim_sleep(t_philo *philo)
+{
+
+}
+*/
+
+// no sé muy bien como terminar la rutina, por lo que tal vez cuando el philo esté full tendría que "matarlo" en alive = 0;
+void    *lone_philo_routine(void *arg)
+{
+    t_philo *philo;
+
+    philo = (t_philo *)arg;
+    wait_all_philos(philo->table);
+    set_long(&philo->philo_mutex, &philo->last_meal_time, get_time(MILLISECONDS));
+    while (!philo->table->ended_sim && philo->alive && !philo->full)
+    {
+        // cena: eat, sleep, nothink, repeat
+        // printf("lone_philo_routine\n");
+        sim_eat(&philo[0]);
+        //sim_sleep(&philo[0]);
+    }
+    return (NULL);
+}
+
 void    create_philos(t_table *table)
 {
     int i;
@@ -113,13 +155,20 @@ void    create_philos(t_table *table)
 
     i = 0;
     philo = table->philos;
-    while (i < table->philo_nbr)
+    if (table->philo_nbr == 1)
     {
-        handle_threads(&philo[i].thread, test_routine, &philo[i], CREATE);
+        handle_threads(&philo[i].thread, lone_philo_routine, &philo[i], CREATE);
         table->threads_running_nbr++;
-        i++;
     }
-    printf("Total de hilos corriendo: %li   [x][x][x][x] [x][x][x][x] [x][x][x][x] [x][x][x][x] \n", table->threads_running_nbr);
+    else
+    {
+        while (i < table->philo_nbr)
+        {
+            handle_threads(&philo[i].thread, test_routine, &philo[i], CREATE);
+            table->threads_running_nbr++;
+            i++;
+        }
+    }
 }
 
 void    join_philos(t_table *table)
@@ -142,6 +191,7 @@ void    all_philos_ready(t_table *table)
 {
     while (table->threads_running_nbr != table->philo_nbr)
         ;
+    //printf("Total de hilos corriendo: %li   [x][x][x][x] [x][x][x][x] [x][x][x][x] [x][x][x][x] \n", table->threads_running_nbr);
     table->sim_start_chrono = get_time(MILLISECONDS);
     table->all_threads_ready = true;
 }
@@ -199,6 +249,7 @@ void    *reaper_routine(void *arg)
 
     table = (t_table *)arg;
     all_philos_ready(table);
+    usleep((table->tt_die / 1e3) / 4);
     check_philos(table);
     return (NULL);
 }
@@ -210,7 +261,7 @@ void    create_reaper(t_table *table)
 
 void    simulation(t_table *table)
 {
-    printf("\n --- [SIMULATION] ---\n");
+    //printf("\n --- [SIMULATION] ---\n");
     // Crear hilos comensales
     create_philos(table);
     // Crear hilo segador
@@ -260,7 +311,6 @@ void    set_bool(t_mutex *mutex, bool *dest, bool new_value)
 
 void    set_long(t_mutex *mutex, long *dest, long new_value)
 {
-    printf("hola\n");
     handle_mutex(mutex, LOCK);
     *dest = new_value;
     handle_mutex(mutex, UNLOCK);
@@ -501,7 +551,7 @@ long    simple_atol(char *str)
         result = (result * 10) + (str[i] - '0');
         i++;
     }
-    printf("result: %li\n", result);
+    //printf("result: %li\n", result);
     return (result);
 }
 
@@ -530,7 +580,7 @@ void    valid_digit(char **argv)
         else
             error_exit("Los valores introducidos no pueden ser menores al ejemplo: ./philo 1 60 60 60 1");
     }
-    correct("Bien, los argumentos introducidos son mayores al ejemplo: ./philo 1 60 60 60 1");
+    //correct("Bien, los argumentos introducidos son mayores al ejemplo: ./philo 1 60 60 60 1");
 }
 
 void    all_digit(char **argv)
@@ -556,7 +606,7 @@ void    all_digit(char **argv)
         j = 0;
         i++;
     }
-    correct("Todos los argumentos son numéricos");
+    //correct("Todos los argumentos son numéricos");
 }
 
 int is_digit(char c)
@@ -608,7 +658,7 @@ int main(int argc, char **argv)
 
     if (argc == 5 || argc == 6)
     {
-        print_args(argc, argv);
+        //print_args(argc, argv);
         parse_input(argv);
         table = safe_malloc(sizeof(t_table) * 1);
         init_data(argc, argv, table);
