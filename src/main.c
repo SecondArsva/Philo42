@@ -38,12 +38,14 @@ void    simulation(t_table *table);
 void    *lone_philo_routine(void *arg);
 void    *tons_philos_routine(void *arg);
 void    *reaper_routine(void *arg); // while !ended_sim siempre
+//void    check_philos(t_table *table); // no va.
+int     all_philos_full(t_table *table);
+int     check_philo_die(t_table *table);
 void    *test_routine(void *arg);
 void    create_philos(t_table *table);
 void    wait_all_philos(t_table *table);
 void    all_philos_ready(t_table *table);
 void    create_reaper(t_table *table);
-void    check_philos(t_table *table);
 void    print_death(t_table *table, long death_time, t_philo *dead_philo);
 void    kill_em_all(t_table *table);
 void    join_philos(t_table *table);
@@ -84,6 +86,7 @@ long    get_time(t_time_units opcode)
     return ((long)"fool_return");
 }
 
+
 void    *test_routine(void *arg)
 {
     t_philo *philo;
@@ -100,8 +103,10 @@ void    *test_routine(void *arg)
     return (NULL);
 }
 
+
 void    wait_all_philos(t_table *table)
 {
+    printf("Espero - wait_all_philos\n"); // debug
     while (!table->all_threads_ready)
         ;
 }
@@ -195,28 +200,31 @@ void    all_philos_ready(t_table *table)
     table->sim_start_chrono = get_time(MILLISECONDS);
     table->all_threads_ready = true;
 }
-
+/*
 void    print_death(t_table *table, long death_time, t_philo *dead_philo)
 {
     handle_mutex(&table->print_mutex, LOCK);
     printf("%li - %li died\n", death_time, dead_philo->id);
     handle_mutex(&table->print_mutex, UNLOCK);
 }
+*/
 
 void    kill_em_all(t_table *table)
 {
     int i;
-    t_philo *philo;
+    t_philo *philos;
 
     i = 0;
-    philo = table->philos;
-    while(i < table->philo_nbr)  
+    philos = table->philos;
+    while(i < get_long(&table->table_mutex, table->philo_nbr))  
     {
-        philo[i].alive = 0;
+        set_bool(&philos[i].philo_mutex, &philos[i].alive, false);
         i++;
     }
 }
 
+// Mata a los philos cuando uno se excede de tiempo entre comida y comida. Da fallos.
+/*
 void    check_philos(t_table *table)
 {
     int     i;
@@ -242,7 +250,79 @@ void    check_philos(t_table *table)
         i = 0;
     }
 }
+*/
 
+// chequea que todos los philos hayan terminado de comer.
+int all_philos_full(t_table *table)
+{
+    long    i;
+    long    full_philos;
+    t_philo *philos;
+
+    i = 0;
+    full_philos = 0;
+    philos = table->philos;
+    while (i < get_long(&table->table_mutex, table->philo_nbr))
+    {
+        if (get_bool(&philos[i].philo_mutex, philos[i].full) == 1)
+            full_philos++;
+        i++;
+    }
+    if (full_philos == get_long(&table->table_mutex, table->philo_nbr))
+        return (1);
+    return (0);
+}
+
+// verifica el estado vital de los philos e imprime y notifica la muerte en caso de morir alguno.
+int check_philo_die(t_table *table)
+{
+    int i;
+    t_philo *philos;
+
+    i = 0;
+    philos = table->philos;
+    while (i < table->philo_nbr)
+    {
+        if (get_bool(&philos[i].philo_mutex, philos[i].alive) == 0)
+        {
+            printf("%i died\n", get_bool(&philos[i].philo_mutex, philos[i].alive)); // faltaría encapsular el tiempo de muerte para imprimirlo. TODO
+            return (1);
+        }
+        i++;
+    }
+    return (0);
+}
+
+/* Nueva rutina del segador: 
+ Símplemente verifica mientras, la simulación no haya acabado,
+ que no haya ningún philo muerto.
+ Los philos han de notificar su muerte.
+ Si hay alguno muerto o si todos comieron hasta llenarse,
+ da por finalizada la simulación. Solo él la finaliza. */
+void    *reaper_routine(void *arg)
+{
+    t_table *table;
+
+    table = (t_table *)arg;
+    printf("Segador creado\n"); // debug
+    wait_all_philos(table);
+    while (!table->ended_sim && !all_philos_full(table))
+    {
+        //printf("Bucle segador\n"); // debug
+        if (check_philo_die(table)) // Si alguno está muerto...
+        {
+            // ...los matas a todos y teminas la simulación
+            set_bool(&table->table_mutex, &table->ended_sim, true);
+            kill_em_all(table);
+        }
+    }
+    // Si no hay muertos y terminaron de comer ha de terminarse la simulación.
+    set_bool(&table->table_mutex, &table->ended_sim, true);
+    printf("Segador fin\n"); // debug
+    return (NULL);
+}
+
+/* me da fallos constantemente. Mata a los philos al iniciar la simulación.
 void    *reaper_routine(void *arg)
 {
     t_table *table;
@@ -253,6 +333,7 @@ void    *reaper_routine(void *arg)
     check_philos(table);
     return (NULL);
 }
+*/
 
 void    create_reaper(t_table *table)
 {
@@ -267,7 +348,7 @@ void    simulation(t_table *table)
     // Crear hilo segador
     create_reaper(table);
     // pistoletazo de salida
-
+    all_philos_ready(table);
     // Esperar a los hilos terminen su rutina con join
     join_philos(table);
 }
