@@ -36,30 +36,35 @@ void    to_multiple_philos(t_philo *philo, t_fork *forks, int position);
 
 void    simulation(t_table *table);
 void    *lone_philo_routine(void *arg);
-void    *tons_philos_routine(void *arg);
+void    *philos_routine(void *arg);
+//void    *tons_philos_routine(void *arg);
 void    *reaper_routine(void *arg); // while !ended_sim siempre
 //void    check_philos(t_table *table); // no va.
 int     all_philos_full(t_table *table);
 int     check_philo_die(t_table *table);
 void    *test_routine(void *arg);
 void    create_philos(t_table *table);
-void    wait_all_philos(t_table *table);
+//void    wait_all_philos(t_table *table);
+void    wait_all_philos(char *rol, t_table *table);
 void    all_philos_ready(t_table *table);
 void    create_reaper(t_table *table);
 void    print_death(t_table *table, long death_time, t_philo *dead_philo);
 void    kill_em_all(t_table *table);
 void    join_philos(t_table *table);
-void    sim_dinner();
+void    sim_dinner(t_philo *philo);
 void    sim_eat(t_philo *philo);
 void    sim_sleep(t_philo *philo);
-void    sim_think();
+// void    sim_think(); // el tiempo de pensar son los padres.
+int     am_i_alive(t_philo *philo); // Estoy vivo?
+int     should_i_dead(t_philo *philo); // Debería estar muerto?
+long    elapsed_time(t_table *table); // tiempo pasado actualmente desde el inicio de la simulación // current sim time
 
 // #--- Wrapped Handle Functions ---#
 
 void    handle_mutex(t_mutex *mutex, t_pthread opcode);
 void    handle_threads(pthread_t *th, void *(*routine)(void *), void *arg, t_pthread opcode);
 long    get_time(t_time_units opcode);
-void    print_action(t_philo *philo, t_print opcode);
+void    print_status(t_philo *philo, t_print opcode); // TODO
 
 // #--- Getter Setters with Security Mutex ---#
 
@@ -68,6 +73,35 @@ long    get_long(t_mutex *mutex, long value);
 void    set_bool(t_mutex *mutex, bool *dest, bool new_value);
 void    set_long(t_mutex *mutex, long *dest, long new_value);
 void    increase_long(t_mutex *mutex, long *dest); // Va mal
+
+// TODO probar el return de get_time
+// TODO progarmar un ft_usleep?
+
+// los printeos necesitan el tiempo en milisegundos, el id del philo y lo que sea que vaya a hacer.
+void    print_status(t_philo *philo, t_print opcode)
+{
+    t_mutex print;
+    t_table *table;
+
+    print = philo->table->print_mutex;
+    table = philo->table;
+    handle_mutex(&print, LOCK);
+    if (opcode == EAT)
+        printf("%li %li is eating\n", elapsed_time(table), philo->id);
+    else if (opcode == SLEEP)
+        printf("%li %li is sleeping\n", elapsed_time(table), philo->id);
+    else if (opcode == THINK)
+        printf("%li %li is thinking\n", elapsed_time(table), philo->id);
+    else if (opcode == DIE)
+        printf("%li %li died\n", elapsed_time(table), philo->id);
+    else if (opcode == FIRST_FORK)
+        printf("%li %li has taken a fork\n", elapsed_time(table), philo->id);
+    else if (opcode == SECOND_FORK)
+        printf("%li %li has taken a fork\n", elapsed_time(table), philo->id);
+    else
+        error_exit("Wrong opcode on get_time function");
+    handle_mutex(&print, UNLOCK);
+}
 
 long    get_time(t_time_units opcode)
 {
@@ -86,6 +120,33 @@ long    get_time(t_time_units opcode)
     return ((long)"fool_return");
 }
 
+/*
+// me falta usar la variable alive.
+void    sim_dinner(t_philo *philo)
+{
+    t_table *table;
+
+    table = philo->table;
+    // mientras la simulación no haya acabado && y no haya terminado de comer
+    while (!get_bool(&table->table_mutex, table->ended_sim) && !get_bool(&philo->philo_mutex, philo->full))
+    {
+        if (philo->hungry && (!pthread_mutex_lock(&philo->first_fork->fork) && !pthread_mutex_lock(&philo->second_fork->fork))) // puedo bloquear tenedores sin problemas y tengo hambre?
+            sim_eat(philo);
+        else
+        {
+            // suelto los tenedores por si acaso he cogido alguno y pienso
+            pthread_mutex_unlock(&philo->first_fork->fork);
+            pthread_mutex_unlock(&philo->second_fork->fork);
+            sim_think(philo);
+            // sigo teniendo hambre
+        }
+        // según termine de comer me pongo a pensar si no me he llenado, no tengo hambre pero he de seguir comiendo tras dormir
+        if (!philo->hungry) // ¿He comido? Si he estado pensado no puedo ponerme ha dormir, tengo hambre
+            sim_sleep(philo);
+            // como he dormido tras comer puedo ponerme a comer de nuevo, tengo hambre
+    }
+}
+*/
 
 void    *test_routine(void *arg)
 {
@@ -99,14 +160,14 @@ void    *test_routine(void *arg)
     printf("Hola, soy el comensal número %li y... ¿estoy vivo?\nphilo[%li]->alive = %i\n", philo->id, philo->id - 1, get_bool(&philo->philo_mutex, philo->alive));
     handle_mutex(&philo->table->print_mutex, UNLOCK);
     usleep(2);
-    wait_all_philos(philo->table);
+    wait_all_philos("comensal", philo->table);
     return (NULL);
 }
 
-
-void    wait_all_philos(t_table *table)
+// spinlock - pistoletazo de salida
+void    wait_all_philos(char *rol, t_table *table)
 {
-    printf("Espero - wait_all_philos\n"); // debug
+    printf("Soy %s: Espero - wait_all_philos\n", rol); // debug
     while (!table->all_threads_ready)
         ;
 }
@@ -128,6 +189,7 @@ void    sim_eat(t_philo *philo)
     if (philo->meals_counter == philo->table->must_eat)
         set_bool(&philo->philo_mutex, &philo->full, true);
 }
+
 /*
 void    sim_sleep(t_philo *philo)
 {
@@ -135,13 +197,44 @@ void    sim_sleep(t_philo *philo)
 }
 */
 
-// no sé muy bien como terminar la rutina, por lo que tal vez cuando el philo esté full tendría que "matarlo" en alive = 0;
+// current simulation time
+long    elapsed_time(t_table *table)
+{
+    return (get_time(MILLISECONDS) - table->sim_start_chrono);
+}
+
+int should_i_dead(t_philo *philo)
+{
+    t_table *table;
+    
+    table = philo->table;
+    if (philo->last_meal_time - elapsed_time(table) >= table->tt_die)
+    {
+        philo->alive = false;
+        return (1);
+    }
+    else
+        return (0);
+}
+
+int am_i_alive(t_philo *philo)
+{
+    if (philo->alive == false)
+        return (0);
+    if (should_i_dead(philo) == 1)
+        return (0);
+    else
+        return (1);
+}
+
+/* Puedes ahorrarte esta función tras el añadido a la nueva rutina de los philos.
+    no sé muy bien como terminar la rutina, por lo que tal vez cuando el philo esté full tendría que "matarlo" en alive = 0;
 void    *lone_philo_routine(void *arg)
 {
     t_philo *philo;
 
     philo = (t_philo *)arg;
-    wait_all_philos(philo->table);
+    wait_all_philos("solito", philo->table);
     set_long(&philo->philo_mutex, &philo->last_meal_time, get_time(MILLISECONDS));
     while (!philo->table->ended_sim && philo->alive && !philo->full)
     {
@@ -152,7 +245,63 @@ void    *lone_philo_routine(void *arg)
     }
     return (NULL);
 }
+*/
 
+void    delay_by_type(t_philo *philo, t_type opcode)
+{
+    if (opcode == EVEN)
+    {
+        if (philo->id % 2 == 0)
+            usleep(2000);
+    }
+    else if (opcode == ODD)
+    {
+        if (philo->id % 2 != 0)
+            usleep(2000);
+    }
+}
+
+// transformo datos
+// espera spinlock para que todos los hilos estén creados antes de que ninguno inicie la simulación
+// delay por pares, la ñapa/chapuza de hacer que esperen por pares
+// bucle de simulación
+void    *philos_routine(void *arg)
+{
+    t_philo *philo;
+    t_table *table;
+
+    philo = (t_philo *)arg;
+    table = philo->table;
+    wait_all_philos("philo", table);
+    if (table->philo_nbr == 1)
+    {
+        // print status pilla tenedor 1
+        usleep(table->tt_die);
+        // print status se muere en tt_die;
+        printf("%li 1 died\n", table->tt_die);
+		return (NULL);
+    }
+    delay_by_type(philo, EVEN);
+    // bucle de la cena para cuando haya más de 1
+}
+
+// new create philos con el que me ahorro una rutina específica para el lone_philo.
+void    create_philos(t_table *table)
+{
+    int i;
+    t_philo *philo;
+
+    i = 0;
+    philo = table->philos;
+    while (i < table->philo_nbr)
+    {
+        handle_threads(&philo[i].thread, philos_routine, &philo[i], CREATE);
+        table->threads_running_nbr++;
+        i++;
+    }
+}
+
+/*
 void    create_philos(t_table *table)
 {
     int i;
@@ -162,19 +311,20 @@ void    create_philos(t_table *table)
     philo = table->philos;
     if (table->philo_nbr == 1)
     {
-        handle_threads(&philo[i].thread, lone_philo_routine, &philo[i], CREATE);
+        handle_threads(&philo[i].thread, lone_philo_routine, &philo[i], CREATE); // TODO adapta la rutina y cambia esta ft.
         table->threads_running_nbr++;
     }
     else
     {
         while (i < table->philo_nbr)
         {
-            handle_threads(&philo[i].thread, test_routine, &philo[i], CREATE);
+            handle_threads(&philo[i].thread, philos_routine, &philo[i], CREATE);
             table->threads_running_nbr++;
             i++;
         }
     }
 }
+*/
 
 void    join_philos(t_table *table)
 {
@@ -200,6 +350,7 @@ void    all_philos_ready(t_table *table)
     table->sim_start_chrono = get_time(MILLISECONDS);
     table->all_threads_ready = true;
 }
+
 /*
 void    print_death(t_table *table, long death_time, t_philo *dead_philo)
 {
@@ -252,7 +403,10 @@ void    check_philos(t_table *table)
 }
 */
 
-// chequea que todos los philos hayan terminado de comer.
+/* Chequea que todos los philos hayan terminado de comer.
+ Sumando +1 a un contador por cada uno que haya acabado
+ compara el resultado con el total de philos, si es igual,
+ han terminado todos y lo notifica mediante el return.*/ 
 int all_philos_full(t_table *table)
 {
     long    i;
@@ -273,7 +427,7 @@ int all_philos_full(t_table *table)
     return (0);
 }
 
-// verifica el estado vital de los philos e imprime y notifica la muerte en caso de morir alguno.
+// verifica el estado vital de los philos e imprime y notifica la muerte con el return en caso de morir alguno.
 int check_philo_die(t_table *table)
 {
     int i;
@@ -305,7 +459,7 @@ void    *reaper_routine(void *arg)
 
     table = (t_table *)arg;
     printf("Segador creado\n"); // debug
-    wait_all_philos(table);
+    wait_all_philos("segador", table);
     while (!table->ended_sim && !all_philos_full(table))
     {
         //printf("Bucle segador\n"); // debug
@@ -547,6 +701,7 @@ void    init_philos(t_table *table)
         handle_mutex(&philos_array[i].philo_mutex, INIT);
         philos_array[i].table = table;
         assign_forks(table->philo_nbr, &philos_array[i], table->forks, i);
+        philos_array[i].hungry = 1;
         i++;
     }
 }
@@ -597,6 +752,7 @@ void    print_philos(t_table *table, t_philo *philos)
         printf(" - table pointer:   %p\n", philos[i].table);
         printf(" - first_fork:      %p\n", philos[i].first_fork);
         printf(" - second_fork:     %p\n", philos[i].second_fork);
+        printf(" - hungry:          %i\n", philos[i].hungry);
         printf("\n");
         i++;
     }

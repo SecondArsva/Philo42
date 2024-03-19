@@ -70,6 +70,7 @@ typedef struct	s_philo{
 	t_fork		*second_fork;
 	t_mutex		philo_mutex;	// usefull for races with grim monitor
 	t_table		*table;	// puntero a la mesa para trabajar con los datos globales
+	bool		hungry; // variable para saber si tiene que comer, pensar o dormir durante la simulación de la cena
 }				t_philo;
 
 // Enum OPCODE for the wrapper handle functions for more
@@ -102,9 +103,18 @@ typedef	enum	e_print
 	SLEEP,
 	THINK,
 	DIE,
-	FIRST_FORK_TAKED,
-	SECOND_FORK_TAKED,
+	FIRST_FORK,
+	SECOND_FORK,
 }				t_print;
+
+//			### NUMBER TYPE OPCODE ###
+// even = par
+// odd = impar
+typedef enum	e_type
+{
+	EVEN,
+	ODD,
+}				t_type;
 
 //			### FUNCTIONS BY FILES ###
 #endif
