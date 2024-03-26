@@ -51,7 +51,7 @@ void    create_reaper(t_table *table);
 void    print_death(t_table *table, long death_time, t_philo *dead_philo);
 void    kill_em_all(t_table *table);
 void    join_philos(t_table *table);
-void    sim_dinner(t_philo *philo);
+// void    sim_dinner(t_philo *philo);
 void    sim_eat(t_philo *philo);
 void    sim_sleep(t_philo *philo);
 // void    sim_think(); // el tiempo de pensar son los padres.
@@ -74,8 +74,14 @@ void    set_bool(t_mutex *mutex, bool *dest, bool new_value);
 void    set_long(t_mutex *mutex, long *dest, long new_value);
 void    increase_long(t_mutex *mutex, long *dest); // Va mal
 
-// TODO probar el return de get_time
+// #--- Clear Data ---#
+
+void    clear_data(t_table *table);
+
+// TODO probar el return de get_time, los resultados no me parecen correctos.
 // TODO progarmar un ft_usleep?
+// usleep recibe microsegundos como argumento y yo estoy trabajando con microsegundos, he de realizar una conversión.
+// la función elapsed time no va bien. Donde debería mostrar 1200 muestra 1000200. HECHO
 
 // los printeos necesitan el tiempo en milisegundos, el id del philo y lo que sea que vaya a hacer.
 void    print_status(t_philo *philo, t_print opcode)
@@ -85,6 +91,7 @@ void    print_status(t_philo *philo, t_print opcode)
 
     print = philo->table->print_mutex;
     table = philo->table;
+    // sleep(3); debug
     handle_mutex(&print, LOCK);
     if (opcode == EAT)
         printf("%li %li is eating\n", elapsed_time(table), philo->id);
@@ -99,9 +106,36 @@ void    print_status(t_philo *philo, t_print opcode)
     else if (opcode == SECOND_FORK)
         printf("%li %li has taken a fork\n", elapsed_time(table), philo->id);
     else
-        error_exit("Wrong opcode on get_time function");
+        error_exit("Wrong opcode on print_status function");
     handle_mutex(&print, UNLOCK);
 }
+
+// Cuando la rutina tire me preocuparé de esto
+void    clear_data(t_table *table)
+{
+    int compila = table->philo_nbr;
+    compila++;
+    printf("philo: Clear Data funtion\n");
+}
+
+/* esto está mal
+long    get_time(t_time_units opcode)
+{
+    struct timeval tv;
+
+    if (gettimeofday(&tv, NULL) == -1)
+		error_exit("Gettimeofday failed");
+    if (opcode == SECONDS)
+        return (tv.tv_sec + (tv.tv_usec / 1e6));
+    else if(opcode == MICROSECONDS)
+        return ((tv.tv_sec * 1e3) + tv.tv_usec);
+    else if (opcode == MILLISECONDS)
+        return ((tv.tv_sec * 1e6) + (tv.tv_usec / 1e3));
+    else
+        error_exit("Wrong opcode on get_time function");
+    return ((long)"fool_return");
+}
+*/
 
 long    get_time(t_time_units opcode)
 {
@@ -112,9 +146,9 @@ long    get_time(t_time_units opcode)
     if (opcode == SECONDS)
         return (tv.tv_sec + tv.tv_usec / 1e6);
     else if(opcode == MICROSECONDS)
-        return (tv.tv_sec * 1e3 + tv.tv_usec);
+        return (tv.tv_sec * 1e6 + tv.tv_usec);
     else if (opcode == MILLISECONDS)
-        return (tv.tv_sec * 1e6 + tv.tv_usec * 1e3);
+        return ((tv.tv_sec * 1e3) + (tv.tv_usec / 1e3));
     else
         error_exit("Wrong opcode on get_time function");
     return ((long)"fool_return");
@@ -159,7 +193,6 @@ void    *test_routine(void *arg)
     printf("\nHilo creado. Identificador:  %li\n", philo->id);
     printf("Hola, soy el comensal número %li y... ¿estoy vivo?\nphilo[%li]->alive = %i\n", philo->id, philo->id - 1, get_bool(&philo->philo_mutex, philo->alive));
     handle_mutex(&philo->table->print_mutex, UNLOCK);
-    usleep(2);
     wait_all_philos("comensal", philo->table);
     return (NULL);
 }
@@ -167,11 +200,14 @@ void    *test_routine(void *arg)
 // spinlock - pistoletazo de salida
 void    wait_all_philos(char *rol, t_table *table)
 {
+    handle_mutex(&table->print_mutex, LOCK); // debug
     printf("Soy %s: Espero - wait_all_philos\n", rol); // debug
+    handle_mutex(&table->print_mutex, UNLOCK); // debug
     while (!table->all_threads_ready)
         ;
 }
 
+/*
 void    sim_eat(t_philo *philo)
 {
     if (philo->alive)
@@ -189,6 +225,7 @@ void    sim_eat(t_philo *philo)
     if (philo->meals_counter == philo->table->must_eat)
         set_bool(&philo->philo_mutex, &philo->full, true);
 }
+*/
 
 /*
 void    sim_sleep(t_philo *philo)
@@ -200,6 +237,8 @@ void    sim_sleep(t_philo *philo)
 // current simulation time
 long    elapsed_time(t_table *table)
 {
+    // printf("pistoletazo: %li\n", table->sim_start_chrono); // debug
+    // printf("transcurrido: %li\n", get_time(MILLISECONDS) - table->sim_start_chrono); // debug
     return (get_time(MILLISECONDS) - table->sim_start_chrono);
 }
 
@@ -211,6 +250,8 @@ int should_i_dead(t_philo *philo)
     if (philo->last_meal_time - elapsed_time(table) >= table->tt_die)
     {
         philo->alive = false;
+        // print_status(&philos[i], DIE); ¿Debería hacer el print de la muerte aquí o desde el reaper? TODO
+        // realmente el que notifica su muerte es el propio philo, si muere luego ya el reaper debe matar a los otros.
         return (1);
     }
     else
@@ -272,17 +313,55 @@ void    *philos_routine(void *arg)
 
     philo = (t_philo *)arg;
     table = philo->table;
+    set_bool(&philo->philo_mutex, &philo->alive, true);
     wait_all_philos("philo", table);
     if (table->philo_nbr == 1)
     {
         // print status pilla tenedor 1
-        usleep(table->tt_die);
+        print_status(philo, FIRST_FORK);
+        printf("sida: %li\n", table->tt_die); // debug
+        usleep(table->tt_die * 1000); // debug
         // print status se muere en tt_die;
-        printf("%li 1 died\n", table->tt_die);
+        print_status(philo, DIE);
+        //printf("%li 1 died\n", table->tt_die);
 		return (NULL);
     }
     delay_by_type(philo, EVEN);
     // bucle de la cena para cuando haya más de 1
+    while (!table->ended_sim && philo->meals_counter != table->must_eat)
+    {
+        // eat
+        sim_eat(philo);
+        // sleep
+        sim_sleep(philo);
+        // se incrementa el iterador 
+        if (am_i_alive(philo))
+            set_long(&philo->philo_mutex, &philo->meals_counter, philo->meals_counter + 1);
+            //increase_long(&philo->philo_mutex, &philo->meals_counter); // iteración
+    }
+    set_bool(&philo->philo_mutex, &philo->full, true);
+    return (NULL);
+}
+
+/* Pilla tenedores, come, suelta tenedores.
+*/
+void    sim_eat(t_philo *philo)
+{
+    // coge tenedores
+    print_status(philo, FIRST_FORK);
+    print_status(philo, FIRST_FORK);
+    // come y espera la comida
+    print_status(philo, EAT);
+    usleep(philo->table->tt_eat * 1000);
+}
+
+/* imprimir que duerme, meter un tiempo de espera que simula la siesta, imprimir pensar.
+*/
+void    sim_sleep(t_philo *philo)
+{
+    print_status(philo, SLEEP);
+    usleep(philo->table->tt_sleep * 1000);
+    print_status(philo, THINK);
 }
 
 // new create philos con el que me ahorro una rutina específica para el lone_philo.
@@ -348,6 +427,7 @@ void    all_philos_ready(t_table *table)
         ;
     //printf("Total de hilos corriendo: %li   [x][x][x][x] [x][x][x][x] [x][x][x][x] [x][x][x][x] \n", table->threads_running_nbr);
     table->sim_start_chrono = get_time(MILLISECONDS);
+    printf("holiwi: %li\n", table->sim_start_chrono); // debug
     table->all_threads_ready = true;
 }
 
@@ -439,7 +519,8 @@ int check_philo_die(t_table *table)
     {
         if (get_bool(&philos[i].philo_mutex, philos[i].alive) == 0)
         {
-            printf("%i died\n", get_bool(&philos[i].philo_mutex, philos[i].alive)); // faltaría encapsular el tiempo de muerte para imprimirlo. TODO
+            print_status(&philos[i], DIE);
+            // printf("%i died\n", get_bool(&philos[i].philo_mutex, philos[i].alive)); // faltaría encapsular el tiempo de muerte para imprimirlo. TODO
             return (1);
         }
         i++;
@@ -458,7 +539,9 @@ void    *reaper_routine(void *arg)
     t_table *table;
 
     table = (t_table *)arg;
+    handle_mutex(&table->print_mutex, LOCK); // debug
     printf("Segador creado\n"); // debug
+    handle_mutex(&table->print_mutex, UNLOCK); //debug 
     wait_all_philos("segador", table);
     while (!table->ended_sim && !all_philos_full(table))
     {
@@ -551,10 +634,10 @@ void    set_long(t_mutex *mutex, long *dest, long new_value)
     handle_mutex(mutex, UNLOCK);
 }
 
-void    increase_long(t_mutex *mutex, long *dest)
+void    increase_long(t_mutex *mutex, long *dest) // revisa como va esto, men.
 {
     handle_mutex(mutex, LOCK);
-    dest++;
+    (*dest)++;
     handle_mutex(mutex, LOCK);
 }
 
@@ -901,6 +984,7 @@ int main(int argc, char **argv)
         init_data(argc, argv, table);
         //print_data(table);
         simulation(table); // Crear simulación. Diseñar como iría. Crear hilos comensales y segador.
+        clear_data(table);
     }
     else
         error_exit("Total de argumentos incorrectos. Han de ser 5 o 6");
