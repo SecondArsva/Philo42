@@ -57,6 +57,7 @@ void    sim_sleep(t_philo *philo);
 // void    sim_think(); // el tiempo de pensar son los padres.
 int     am_i_alive(t_philo *philo); // Estoy vivo?
 int     should_i_dead(t_philo *philo); // Debería estar muerto?
+int     run(t_philo *philo); // function for philo that check that can continue
 long    elapsed_time(t_table *table); // tiempo pasado actualmente desde el inicio de la simulación // current sim time
 
 // #--- Wrapped Handle Functions ---#
@@ -80,8 +81,9 @@ void    clear_data(t_table *table);
 
 // TODO probar el return de get_time, los resultados no me parecen correctos.
 // TODO progarmar un ft_usleep?
-// usleep recibe microsegundos como argumento y yo estoy trabajando con microsegundos, he de realizar una conversión.
-// la función elapsed time no va bien. Donde debería mostrar 1200 muestra 1000200. HECHO
+// usleep recibe microsegundos como argumento y yo estoy trabajando con microsegundos, he de realizar una conversión. (+ 1000)
+// mi get_time añade milisegundos que me pueden llegar a joder... si algo ocurre en el millisecond 0, me pone que sucede en 1.
+// ¿El last_meal_time se actualiza tras bloquear los tenedores o tras la espera de la comida antes de desbloquearlos?
 
 // los printeos necesitan el tiempo en milisegundos, el id del philo y lo que sea que vaya a hacer.
 void    print_status(t_philo *philo, t_print opcode)
@@ -94,19 +96,20 @@ void    print_status(t_philo *philo, t_print opcode)
     // sleep(3); debug
     handle_mutex(&print, LOCK);
     if (opcode == EAT)
-        printf("%li %li is eating\n", elapsed_time(table), philo->id);
+        printf("%s%li %li is eating\n", CG, elapsed_time(table), philo->id);
     else if (opcode == SLEEP)
-        printf("%li %li is sleeping\n", elapsed_time(table), philo->id);
+        printf("%s%li %li is sleeping\n", CB, elapsed_time(table), philo->id);
     else if (opcode == THINK)
-        printf("%li %li is thinking\n", elapsed_time(table), philo->id);
+        printf("%s%li %li is thinking\n", CM, elapsed_time(table), philo->id);
     else if (opcode == DIE)
-        printf("%li %li died\n", elapsed_time(table), philo->id);
+        printf("%s%li %li died\n", CR, elapsed_time(table), philo->id);
     else if (opcode == FIRST_FORK)
-        printf("%li %li has taken a fork\n", elapsed_time(table), philo->id);
+        printf("%s%li %li has taken a fork\n", CY, elapsed_time(table), philo->id);
     else if (opcode == SECOND_FORK)
-        printf("%li %li has taken a fork\n", elapsed_time(table), philo->id);
+        printf("%s%li %li has taken a fork\n", CY, elapsed_time(table), philo->id);
     else
         error_exit("Wrong opcode on print_status function");
+    printf("%s", CW);
     handle_mutex(&print, UNLOCK);
 }
 
@@ -234,24 +237,41 @@ void    sim_sleep(t_philo *philo)
 }
 */
 
+// creo que esto me está jodiendo, tal vez no debería hacer esta resta... - TODO
 // current simulation time
 long    elapsed_time(t_table *table)
 {
     // printf("pistoletazo: %li\n", table->sim_start_chrono); // debug
     // printf("transcurrido: %li\n", get_time(MILLISECONDS) - table->sim_start_chrono); // debug
-    return (get_time(MILLISECONDS) - table->sim_start_chrono);
+    return ((get_time(MILLISECONDS) - table->sim_start_chrono));
 }
 
+int run(t_philo *philo)
+{
+    bool end;
+
+    end = get_bool(&philo->philo_mutex, philo->table->ended_sim);
+    if (!end && am_i_alive(philo))
+        return (1);
+    else
+        return (0);
+}
+
+// print_status(&philos[i], DIE); ¿Debería hacer el print de la muerte aquí o desde el reaper? TODO
+// realmente el que notifica su muerte es el propio philo, si muere luego ya el reaper debe matar a los otros.
 int should_i_dead(t_philo *philo)
 {
     t_table *table;
-    
+    long    current;
+    long    last_meal;
+
     table = philo->table;
-    if (philo->last_meal_time - elapsed_time(table) >= table->tt_die)
+    current = get_time(MILLISECONDS);
+    last_meal = get_long(&philo->philo_mutex, philo->last_meal_time);
+    //if (get_long(&philo->philo_mutex, philo->last_meal_time) - elapsed_time(table) >= table->tt_die) // mal
+    if (current - last_meal >= table->tt_die) // bien
     {
-        philo->alive = false;
-        // print_status(&philos[i], DIE); ¿Debería hacer el print de la muerte aquí o desde el reaper? TODO
-        // realmente el que notifica su muerte es el propio philo, si muere luego ya el reaper debe matar a los otros.
+        set_bool(&philo->philo_mutex, &philo->alive, false);
         return (1);
     }
     else
@@ -260,9 +280,9 @@ int should_i_dead(t_philo *philo)
 
 int am_i_alive(t_philo *philo)
 {
-    if (philo->alive == false)
+    if (get_bool(&philo->philo_mutex, philo->alive) == false)
         return (0);
-    if (should_i_dead(philo) == 1)
+    else if (should_i_dead(philo) == 1)
         return (0);
     else
         return (1);
@@ -326,6 +346,8 @@ void    *philos_routine(void *arg)
         //printf("%li 1 died\n", table->tt_die);
 		return (NULL);
     }
+    // mas de un philo
+    philo->last_meal_time = table->sim_start_chrono; // para que no se muera en la primera ejecucion del primer hilo
     delay_by_type(philo, EVEN);
     // bucle de la cena para cuando haya más de 1
     while (!table->ended_sim && philo->meals_counter != table->must_eat)
@@ -359,9 +381,13 @@ void    sim_eat(t_philo *philo)
 */
 void    sim_sleep(t_philo *philo)
 {
-    print_status(philo, SLEEP);
-    usleep(philo->table->tt_sleep * 1000);
-    print_status(philo, THINK);
+    if (am_i_alive(philo))
+    {
+        print_status(philo, SLEEP);
+        usleep(philo->table->tt_sleep * 1000);
+    }
+    if (am_i_alive(philo))
+        print_status(philo, THINK);
 }
 
 // new create philos con el que me ahorro una rutina específica para el lone_philo.
