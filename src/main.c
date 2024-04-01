@@ -62,6 +62,8 @@ int     can_run(t_philo *philo); // function for philo that check that can conti
 long    elapsed_time(t_table *table); // tiempo pasado actualmente desde el inicio de la simulación // current sim time
 void    handle_forks(t_philo *philo, t_handle_forks opcode);
 void    *secured_nap(t_philo *philo, long milli);
+void    destroy_all_mutex(t_table *table);
+void    free_memory(t_table *table);
 
 // #--- Wrapped Handle Functions ---#
 
@@ -143,7 +145,9 @@ void    print_status(t_philo *philo, t_print opcode)
         else if (opcode == DIE)
         {
             printf("%s%li %li died\n", CR, elapsed_time(table), philo->id);
-            handle_mutex(&print, DESTROY); // pincho tip. <3
+            handle_mutex(&print, UNLOCK);
+            handle_mutex(&print, DESTROY); // pincho tip. <3 No va bien. TODO
+            return ;
         }
         else if (opcode == FIRST_FORK)
             printf("%s%li %li has taken a fork\n", CY, elapsed_time(table), philo->id);
@@ -157,12 +161,44 @@ void    print_status(t_philo *philo, t_print opcode)
     }
 }
 
+void    destroy_all_mutex(t_table *table)
+{
+    int     i;
+    t_philo *philo;
+    t_fork  *fork;
+
+    i = 0;
+    philo = table->philos;
+    fork = table->forks;
+    while (i <= table->philo_nbr)
+    {
+        handle_mutex(&philo[i].philo_mutex, DESTROY);
+        i++;
+    }
+    i = 0;
+    while (i <= table->philo_nbr)
+    {
+        handle_mutex(&fork[i].fork, DESTROY);
+        i++;
+    }
+    handle_mutex(&table->table_mutex, DESTROY);
+    handle_mutex(&table->print_mutex, DESTROY);
+}
+
+void    free_memory(t_table *table)
+{
+    free(table->philos);
+    free(table->forks);
+    free(table);
+}
+
 // Cuando la rutina tire me preocuparé de esto
 void    clear_data(t_table *table)
 {
-    int compila = table->philo_nbr;
-    compila++;
-    printf("philo: Clear Data funtion\n");
+    // printf("philo: Clear Data funtion\n");
+    // destruir mutexes y liberar todo lo allocado en memoria.
+    destroy_all_mutex(table);
+    free_memory(table);
 }
 
 /* esto está mal
