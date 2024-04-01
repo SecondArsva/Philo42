@@ -89,7 +89,7 @@ void    clear_data(t_table *table);
 // TODO progarmar un ft_usleep? Si, para evitar que un philo muerto siga manteniendo la simulación activa al no notificar su muerte durante una espera.
 // TODO Comprueba por que da segfault cuando un philo se muere mientras come o duerme al usar secured nap.
 // TODO haz el puto clear de alocaciones de memoria.
-
+// TODO proteger printeos para evitar que uno escriba tras la muerte de otro.
 
 // my safe usleep for the waitings while eating or sleeping
 void    *secured_nap(t_philo *philo, long milli)
@@ -148,7 +148,7 @@ void    print_status(t_philo *philo, t_print opcode)
         else
             error_exit("Wrong opcode on print_status function");
         printf("%s", CW);
-        printf("philo %li - alive: %i | ended_sim: %i\n", philo->id, get_bool(&philo->philo_mutex, philo->alive), get_bool(&philo->table->table_mutex, philo->table->ended_sim)); // debug
+        //printf("philo %li - alive: %i | ended_sim: %i\n", philo->id, get_bool(&philo->philo_mutex, philo->alive), get_bool(&philo->table->table_mutex, philo->table->ended_sim)); // debug
         handle_mutex(&print, UNLOCK);
     }
 }
@@ -444,9 +444,11 @@ void    handle_forks(t_philo *philo, t_handle_forks opcode)
 void    *sim_eat(t_philo *philo)
 {
     // coge tenedores
-    handle_forks(philo, GRAB);
+    if (can_run(philo))
+        handle_forks(philo, GRAB);
     // come y espera la comida
-    print_status(philo, EAT);
+    if (can_run(philo))
+        print_status(philo, EAT);
     //usleep(philo->table->tt_eat * 1000); // TODO safe_usleep
     secured_nap(philo, philo->table->tt_eat); // my usleep
     set_long(&philo->philo_mutex, &philo->last_meal_time, get_time(MILLISECONDS));
@@ -459,10 +461,12 @@ void    *sim_eat(t_philo *philo)
 */
 void    *sim_sleep(t_philo *philo)
 {
-    print_status(philo, SLEEP);
+    if (can_run(philo))
+        print_status(philo, SLEEP);
     // usleep(philo->table->tt_sleep);
     secured_nap(philo, philo->table->tt_sleep); // my usleep
-    print_status(philo, THINK);
+    if (can_run(philo))
+        print_status(philo, THINK);
     return(NULL);
 }
 
