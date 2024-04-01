@@ -90,6 +90,7 @@ void    clear_data(t_table *table);
 // TODO Comprueba por que da segfault cuando un philo se muere mientras come o duerme al usar secured nap.
 // TODO haz el puto clear de alocaciones de memoria.
 // TODO proteger printeos para evitar que uno escriba tras la muerte de otro.
+// Me da un "Aborted" al ejecutar más de 166 philosophers. Esto falla en mi OMEN, en los Macs tanto los del campus como los de los compis va de locos.
 
 // my safe usleep for the waitings while eating or sleeping
 void    *secured_nap(t_philo *philo, long milli)
@@ -140,7 +141,10 @@ void    print_status(t_philo *philo, t_print opcode)
         else if (opcode == THINK)
             printf("%s%li %li is thinking\n", CM, elapsed_time(table), philo->id);
         else if (opcode == DIE)
+        {
             printf("%s%li %li died\n", CR, elapsed_time(table), philo->id);
+            handle_mutex(&print, DESTROY); // pincho tip. <3
+        }
         else if (opcode == FIRST_FORK)
             printf("%s%li %li has taken a fork\n", CY, elapsed_time(table), philo->id);
         else if (opcode == SECOND_FORK)
@@ -695,6 +699,7 @@ void    simulation(t_table *table)
     all_philos_ready(table);
     // Esperar a los hilos terminen su rutina con join
     join_philos(table);
+    handle_threads(&table->reaper, NULL, NULL, JOIN);
 }
 
 void    handle_threads(pthread_t *th, void *(*routine)(void *), void *arg, t_pthread opcode)
