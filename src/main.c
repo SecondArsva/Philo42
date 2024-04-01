@@ -13,6 +13,7 @@ void    print_forks(t_table *table, t_fork *forks);
 void    print_philos(t_table *table, t_philo *philos);
 void    print_table(t_table *table);
 void    print_data(t_table *table);
+void    print_debug(t_table *table, char *text);
 
 // #--- Parseo ---#      Listo, no toques nada del parseo.
 
@@ -52,8 +53,8 @@ void    print_death(t_table *table, long death_time, t_philo *dead_philo);
 void    kill_em_all(t_table *table);
 void    join_philos(t_table *table);
 // void    sim_dinner(t_philo *philo);
-void    sim_eat(t_philo *philo);
-void    sim_sleep(t_philo *philo);
+void    *sim_eat(t_philo *philo);
+void    *sim_sleep(t_philo *philo);
 // void    sim_think(); // el tiempo de pensar son los padres.
 int     am_i_alive(t_philo *philo); // Estoy vivo?
 int     should_i_dead(t_philo *philo); // Debería estar muerto?
@@ -81,11 +82,14 @@ void    increase_long(t_mutex *mutex, long *dest); // Va mal
 
 void    clear_data(t_table *table);
 
-// TODO probar el return de get_time, los resultados no me parecen correctos.
-// TODO progarmar un ft_usleep? Si, para evitar que un philo muerto siga manteniendo la simulación activa al no notificar su muerte durante una espera.
-// usleep recibe microsegundos como argumento y yo estoy trabajando con microsegundos, he de realizar una conversión. (+ 1000)
+
+// usleep recibe microsegundos como argumento y yo estoy trabajando con microsegundos, he de realizar una conversión. (* 1000)
 // mi get_time añade milisegundos que me pueden llegar a joder... si algo ocurre en el millisecond 0, me pone que sucede en 1.
 // ¿El last_meal_time se actualiza tras bloquear los tenedores o tras la espera de la comida antes de desbloquearlos?
+// TODO progarmar un ft_usleep? Si, para evitar que un philo muerto siga manteniendo la simulación activa al no notificar su muerte durante una espera.
+// TODO Comprueba por que da segfault cuando un philo se muere mientras come o duerme al usar secured nap.
+// TODO haz el puto clear de alocaciones de memoria.
+
 
 // my safe usleep for the waitings while eating or sleeping
 void    *secured_nap(t_philo *philo, long milli)
@@ -109,6 +113,13 @@ void    *secured_nap(t_philo *philo, long milli)
     return (NULL);
 }
 
+void    print_debug(t_table *table, char *text)
+{
+    handle_mutex(&table->print_mutex, LOCK);
+    printf("%s\n", text);
+    handle_mutex(&table->print_mutex, UNLOCK);
+}
+
 // los printeos necesitan el tiempo en milisegundos, el id del philo y lo que sea que vaya a hacer.
 void    print_status(t_philo *philo, t_print opcode)
 {
@@ -118,7 +129,7 @@ void    print_status(t_philo *philo, t_print opcode)
     print = philo->table->print_mutex;
     table = philo->table;
     // debería meter una comprobación para que si están muertos no hagan nada. TODO
-    if (am_i_alive(philo))
+    if (!get_bool(&table->table_mutex, table->ended_sim)) // TODO
     {
         // sleep(3); debug
         handle_mutex(&print, LOCK);
@@ -129,10 +140,7 @@ void    print_status(t_philo *philo, t_print opcode)
         else if (opcode == THINK)
             printf("%s%li %li is thinking\n", CM, elapsed_time(table), philo->id);
         else if (opcode == DIE)
-        {
             printf("%s%li %li died\n", CR, elapsed_time(table), philo->id);
-            set_bool(&philo->philo_mutex, &philo->alive, false);
-        }
         else if (opcode == FIRST_FORK)
             printf("%s%li %li has taken a fork\n", CY, elapsed_time(table), philo->id);
         else if (opcode == SECOND_FORK)
@@ -140,6 +148,7 @@ void    print_status(t_philo *philo, t_print opcode)
         else
             error_exit("Wrong opcode on print_status function");
         printf("%s", CW);
+        printf("philo %li - alive: %i | ended_sim: %i\n", philo->id, get_bool(&philo->philo_mutex, philo->alive), get_bool(&philo->table->table_mutex, philo->table->ended_sim)); // debug
         handle_mutex(&print, UNLOCK);
     }
 }
@@ -288,6 +297,7 @@ long    elapsed_time(t_table *table)
 }
 
 /* no puedo usar esta función porque el philo se está comunicando con "dios"
+*/
 int can_run(t_philo *philo)
 {
     bool end;
@@ -298,7 +308,6 @@ int can_run(t_philo *philo)
     else
         return (0);
 }
-*/
 
 // print_status(&philos[i], DIE); ¿Debería hacer el print de la muerte aquí o desde el reaper? TODO
 // realmente el que notifica su muerte es el propio philo, si muere luego ya el reaper debe matar a los otros.
@@ -312,10 +321,11 @@ int should_i_dead(t_philo *philo)
     current = get_time(MILLISECONDS);
     last_meal = get_long(&philo->philo_mutex, philo->last_meal_time);
     //if (get_long(&philo->philo_mutex, philo->last_meal_time) - elapsed_time(table) >= table->tt_die) // mal
+    // si ha pasado demasiado tiempo tras la última comida, lo matas.
     if (current - last_meal >= table->tt_die) // bien
     {
-        print_status(philo, DIE); // lo mato tras el print con el mutex
-        // set_bool(&philo->philo_mutex, &philo->alive, false);
+        //print_status(philo, DIE);
+        set_bool(&philo->philo_mutex, &philo->alive, false);
         return (1);
     }
     else
@@ -324,12 +334,14 @@ int should_i_dead(t_philo *philo)
 
 int am_i_alive(t_philo *philo)
 {
+    
     if (get_bool(&philo->philo_mutex, philo->alive) == false)
         return (0);
     else if (should_i_dead(philo) == 1)
         return (0);
     else
         return (1);
+    print_debug(philo->table, "1");
 }
 
 /* Puedes ahorrarte esta función tras el añadido a la nueva rutina de los philos.
@@ -385,23 +397,25 @@ void    *philos_routine(void *arg)
         // print status pilla tenedor 1
         print_status(philo, FIRST_FORK);
         usleep(table->tt_die * 1000); // debug
-        printf("sida: %li\n", table->tt_die); // debug
         // print status se muere en tt_die;
         print_status(philo, DIE);
         //printf("%li 1 died\n", table->tt_die);
 		return (NULL);
     }
-    // mas de un philo
+    // más de un philo
     philo->last_meal_time = table->sim_start_chrono; // para que no se muera en la primera ejecucion del primer hilo
     delay_by_type(philo, EVEN);
     // bucle de la cena para cuando haya más de 1
-    while (am_i_alive(philo) && get_long(&philo->philo_mutex, philo->meals_counter) != table->must_eat)
+    while (can_run(philo) && get_long(&philo->philo_mutex, philo->meals_counter) != table->must_eat)
     {
         // eat
-        sim_eat(philo);
+        if (can_run(philo))
+            sim_eat(philo);
         // sleep
-        sim_sleep(philo);
+        if (can_run(philo))
+            sim_sleep(philo);
         // se incrementa el iterador
+        set_long(&philo->philo_mutex, &philo->meals_counter, philo->meals_counter + 1);
     }
     set_bool(&philo->philo_mutex, &philo->full, true);
     return (NULL);
@@ -427,26 +441,29 @@ void    handle_forks(t_philo *philo, t_handle_forks opcode)
 
 /* Pilla tenedores, espera a terminar de comer, actualizo last_meal_time, suelta tenedores.
 */
-void    sim_eat(t_philo *philo)
+void    *sim_eat(t_philo *philo)
 {
     // coge tenedores
     handle_forks(philo, GRAB);
     // come y espera la comida
     print_status(philo, EAT);
     //usleep(philo->table->tt_eat * 1000); // TODO safe_usleep
-    secured_nap(philo, philo->table->tt_eat);
+    secured_nap(philo, philo->table->tt_eat); // my usleep
     set_long(&philo->philo_mutex, &philo->last_meal_time, get_time(MILLISECONDS));
     handle_forks(philo, RELEASE);
-    set_long(&philo->philo_mutex, &philo->meals_counter, philo->meals_counter + 1);
+    //set_long(&philo->philo_mutex, &philo->meals_counter, philo->meals_counter + 1);
+    return(NULL);
 }
 
 /* imprimir que duerme, meter un tiempo de espera que simula la siesta, imprimir pensar.
 */
-void    sim_sleep(t_philo *philo)
+void    *sim_sleep(t_philo *philo)
 {
     print_status(philo, SLEEP);
-    secured_nap(philo, philo->table->tt_sleep);
+    // usleep(philo->table->tt_sleep);
+    secured_nap(philo, philo->table->tt_sleep); // my usleep
     print_status(philo, THINK);
+    return(NULL);
 }
 
 // new create philos con el que me ahorro una rutina específica para el lone_philo.
@@ -532,7 +549,7 @@ void    kill_em_all(t_table *table)
 
     i = 0;
     philos = table->philos;
-    while(i < get_long(&table->table_mutex, table->philo_nbr))  
+    while(i < get_long(&table->table_mutex, table->philo_nbr))
     {
         set_bool(&philos[i].philo_mutex, &philos[i].alive, false);
         i++;
@@ -583,7 +600,7 @@ int all_philos_full(t_table *table)
     philos = table->philos;
     while (i < get_long(&table->table_mutex, table->philo_nbr))
     {
-        if (get_bool(&philos[i].philo_mutex, philos[i].full) == 1)
+        if (get_bool(&philos[i].philo_mutex, philos[i].full) == true)
             full_philos++;
         i++;
     }
@@ -602,7 +619,7 @@ int check_philo_die(t_table *table)
     philos = table->philos;
     while (i < table->philo_nbr)
     {
-        if (get_bool(&philos[i].philo_mutex, philos[i].alive) == 0)
+        if (get_bool(&philos[i].philo_mutex, philos[i].alive) == false)
         {
             print_status(&philos[i], DIE);
             // printf("%i died\n", get_bool(&philos[i].philo_mutex, philos[i].alive)); // faltaría encapsular el tiempo de muerte para imprimirlo. TODO
@@ -624,12 +641,12 @@ void    *reaper_routine(void *arg)
     t_table *table;
 
     table = (t_table *)arg;
-    handle_mutex(&table->print_mutex, LOCK); // debug
+    // handle_mutex(&table->print_mutex, LOCK); // debug
     // printf("Segador creado\n"); // debug
-    handle_mutex(&table->print_mutex, UNLOCK); //debug 
+    // handle_mutex(&table->print_mutex, UNLOCK); //debug 
     // wait_all_philos("segador", table); // for debug
     wait_all_philos(table);
-    while (!table->ended_sim && !all_philos_full(table))
+    while (!get_bool(&table->table_mutex, table->ended_sim) && !all_philos_full(table))
     {
         //printf("Bucle segador\n"); // debug
         if (check_philo_die(table)) // Si alguno está muerto...
@@ -641,7 +658,7 @@ void    *reaper_routine(void *arg)
     }
     // Si no hay muertos y terminaron de comer ha de terminarse la simulación.
     set_bool(&table->table_mutex, &table->ended_sim, true);
-    printf("Segador fin\n"); // debug
+    //printf("Segador fin\n"); // debug
     return (NULL);
 }
 
