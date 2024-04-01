@@ -23,6 +23,14 @@
 # include <errno.h>		// pthreads errors
 #include <stdbool.h>	// for use the bool variable type
 
+// Definición de macros para colores
+# define CR	"\033[0;31m"
+# define CY	"\033[0;33m"
+# define CB	"\033[0;34m"
+# define CM	"\033[0;35m"
+# define CG	"\033[0;32m"
+# define CW	"\033[0;37m"
+
 // forward declarations
 //typedef s_fork	t_fork;
 //typedef s_table t_table;
@@ -115,6 +123,12 @@ typedef enum	e_type
 	EVEN,
 	ODD,
 }				t_type;
+
+typedef enum	e_handle_forks
+{
+	GRAB,
+	RELEASE,
+}				t_handle_forks;
 
 //			### FUNCTIONS BY FILES ###
 #endif
