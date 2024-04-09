@@ -85,14 +85,34 @@ void    increase_long(t_mutex *mutex, long *dest); // Va mal
 void    clear_data(t_table *table);
 
 
-// usleep recibe microsegundos como argumento y yo estoy trabajando con microsegundos, he de realizar una conversión. (* 1000)
-// mi get_time añade milisegundos que me pueden llegar a joder... si algo ocurre en el millisecond 0, me pone que sucede en 1.
-// ¿El last_meal_time se actualiza tras bloquear los tenedores o tras la espera de la comida antes de desbloquearlos?
-// TODO progarmar un ft_usleep? Si, para evitar que un philo muerto siga manteniendo la simulación activa al no notificar su muerte durante una espera.
-// TODO Comprueba por que da segfault cuando un philo se muere mientras come o duerme al usar secured nap.
-// TODO haz el puto clear de alocaciones de memoria.
-// TODO proteger printeos para evitar que uno escriba tras la muerte de otro.
-// Me da un "Aborted" al ejecutar más de 166 philosophers. Esto falla en mi OMEN, en los Macs tanto los del campus como los de los compis va de locos.
+/* usleep recibe microsegundos como argumento y yo estoy trabajando con microsegundos, he de realizar una conversión. (* 1000)
+ 
+ mi get_time añade milisegundos que me pueden llegar a joder... si algo ocurre en el millisecond 0, me pone que sucede en 1.
+ 
+ ¿El last_meal_time se actualiza tras bloquear los tenedores o tras la espera de la comida antes de desbloquearlos?
+ 
+ TODO progarmar un ft_usleep? Si, para evitar que un philo muerto siga manteniendo la simulación activa al no notificar su muerte durante una espera.
+ TODO Comprueba por que da segfault cuando un philo se muere mientras come o duerme al usar secured nap.
+ TODO haz el puto clear de alocaciones de memoria.
+ TODO proteger printeos para evitar que uno escriba tras la muerte de otro.
+ 
+ Me da un "Aborted" al ejecutar más de 166 philosophers. Esto falla en mi OMEN, en los Macs tanto los del campus como los de los compis va de locos.
+ 
+ pincho me ha colado "./philo 3 300 150 150"
+ 
+ No puedo destruir el mutex del print en cuanto muera un philo ya que justo antes habrá otros philos en espera para usarlo y, posiblemente eso sea por lo que da el "Illegal HArdware Instruccion"
+ 
+ jvasquez me ha recomendado crear una variable que según su estado, un philo pueda escribir o no.
+Realmente es como el booleano que tengo para determinar el fin de la simulación,
+pero mientras que este último solo lo modifica el "reaper",
+jvasquez me recomienda que esta variable sea una para todos los philos y cualquiera de ellos pueda
+modificarla en el momento en el que muera. */
+
+//# FALLOS A ULTIMAR #
+// TODO Siguen saliendo printeos tras la muerte de un philo
+// TODO al finalizar el programa, bien sea por la muerte de un philo o porque todos los philos hayan terminado de comer, me sale
+// "zsh: illegal hardware instruction" y los argumentos introducidos ./philo 5 1000 470 470 2
+// En bash me sale "Illegal instruction: 4".
 
 // my safe usleep for the waitings while eating or sleeping
 void    *secured_nap(t_philo *philo, long milli)
@@ -146,7 +166,7 @@ void    print_status(t_philo *philo, t_print opcode)
         {
             printf("%s%li %li died\n", CR, elapsed_time(table), philo->id);
             handle_mutex(&print, UNLOCK);
-            handle_mutex(&print, DESTROY); // pincho tip. <3 No va bien. TODO
+            handle_mutex(&print, DESTROY); // pincho tip. <3 No va bien. TODO vicmarti tip, destruye tras recoger a los hilos.
             return ;
         }
         else if (opcode == FIRST_FORK)
