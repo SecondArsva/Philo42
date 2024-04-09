@@ -106,7 +106,17 @@ void    clear_data(t_table *table);
 Realmente es como el booleano que tengo para determinar el fin de la simulación,
 pero mientras que este último solo lo modifica el "reaper",
 jvasquez me recomienda que esta variable sea una para todos los philos y cualquiera de ellos pueda
-modificarla en el momento en el que muera. */
+modificarla en el momento en el que muera.
+La implementación de esta variable ha disminuido notablemente los posibles printeos tras la muerte de un filósofo,
+pero a más comensales se añadan a la simulacion y a menor sean los tiempos, más probabilidad hay de que el error se de.
+Con "./philo 90 140 60 60" el error sale de forma excesiva. En cambio con "./philo 5 300 150 150" no se da tanto como antes,
+pero igualmente si sale una vez... KO!
+
+acaceres ha dado con el error del "Illegal Hardware Instruction" y es que resulta que en los condicionales if en la liberación
+de los mutexex de los philos y los forks tenía "<=" y con esto el iterador sobrepasaba el número de slots de ambos arrays y
+trataba de liberar algo fuera del array. Recuerda que el iterador inicia en 0 y el philo_nbr lo hace desde 1. Por ello la
+iteración deberá hacerse siempre y cuando el iterador sea menor a philo_nbr.
+*/
 
 //# FALLOS A ULTIMAR #
 // TODO Siguen saliendo printeos tras la muerte de un philo
@@ -190,13 +200,13 @@ void    destroy_all_mutex(t_table *table)
     i = 0;
     philo = table->philos;
     fork = table->forks;
-    while (i <= table->philo_nbr)
+    while (i < table->philo_nbr)
     {
         handle_mutex(&philo[i].philo_mutex, DESTROY);
         i++;
     }
     i = 0;
-    while (i <= table->philo_nbr)
+    while (i < table->philo_nbr)
     {
         handle_mutex(&fork[i].fork, DESTROY);
         i++;
