@@ -155,6 +155,8 @@ void    print_status(t_philo *philo, t_print opcode)
     if (!get_bool(&table->table_mutex, table->ended_sim)) // TODO
     {
         // sleep(3); debug
+        if (!get_bool(&table->table_mutex, table->can_print))
+            return ;
         handle_mutex(&print, LOCK);
         if (opcode == EAT)
             printf("%s%li %li is eating\n", CG, elapsed_time(table), philo->id);
@@ -165,9 +167,7 @@ void    print_status(t_philo *philo, t_print opcode)
         else if (opcode == DIE)
         {
             printf("%s%li %li died\n", CR, elapsed_time(table), philo->id);
-            handle_mutex(&print, UNLOCK);
-            handle_mutex(&print, DESTROY); // pincho tip. <3 No va bien. TODO vicmarti tip, destruye tras recoger a los hilos.
-            return ;
+            set_bool(&table->table_mutex, &table->can_print, false);
         }
         else if (opcode == FIRST_FORK)
             printf("%s%li %li has taken a fork\n", CY, elapsed_time(table), philo->id);
@@ -879,6 +879,7 @@ void    init_table(int argc, char **argv, t_table *table)
     table->sim_start_chrono = 0;
     table->ended_sim = false;
     table->all_threads_ready = false;
+    table->can_print = true;
     table->threads_running_nbr = 0;
     handle_mutex(&table->table_mutex, INIT);
     handle_mutex(&table->print_mutex, INIT);
