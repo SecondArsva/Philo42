@@ -56,6 +56,7 @@ typedef struct	s_table{	// datos globales a falta de poder tener variables globa
 	long		sim_start_chrono;	// importante para el timestamp. TODO start_sim_time. Inicio de la simulación.
 	bool		ended_sim; // a philo dies or all philos full;
 	bool		all_threads_ready; // synchro philo to start at the same time
+	bool		can_print; // recomendación de jvasquez para evitar que los philos printeen tras la muerte de un philo.
 	long		threads_running_nbr;
 	
 	t_mutex		table_mutex;	// avoid races while reading from table
