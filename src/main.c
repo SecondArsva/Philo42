@@ -175,23 +175,23 @@ void    print_status(t_philo *philo, t_print opcode)
         if (!get_bool(&table->table_mutex, table->can_print))
             return ;
         handle_mutex(&print, LOCK);
-        if (opcode == EAT)
+        if (opcode == EAT && get_bool(&table->table_mutex, table->can_print))
             printf("%s%li %li is eating\n", CG, elapsed_time(table), philo->id);
-        else if (opcode == SLEEP)
+        else if (opcode == SLEEP && get_bool(&table->table_mutex, table->can_print))
             printf("%s%li %li is sleeping\n", CB, elapsed_time(table), philo->id);
-        else if (opcode == THINK)
+        else if (opcode == THINK && get_bool(&table->table_mutex, table->can_print))
             printf("%s%li %li is thinking\n", CM, elapsed_time(table), philo->id);
-        else if (opcode == DIE)
+        else if (opcode == DIE && get_bool(&table->table_mutex, table->can_print))
         {
             printf("%s%li %li died\n", CR, elapsed_time(table), philo->id);
             set_bool(&table->table_mutex, &table->can_print, false);
         }
-        else if (opcode == FIRST_FORK)
-            printf("%s%li %li has taken a fork\n", CY, elapsed_time(table), philo->id);
-        else if (opcode == SECOND_FORK)
-            printf("%s%li %li has taken a fork\n", CY, elapsed_time(table), philo->id);
-        else
-            return ;
+        else if (opcode == FIRST_FORK && get_bool(&table->table_mutex, table->can_print))
+            printf("%s%li %li has taken a fork - 1\n", CY, elapsed_time(table), philo->id);
+        else if (opcode == SECOND_FORK && get_bool(&table->table_mutex, table->can_print))
+            printf("%s%li %li has taken a fork - 2\n", CY, elapsed_time(table), philo->id);
+        //else
+        //   return ;
         printf("%s", CW);
         //printf("philo %li - alive: %i | ended_sim: %i\n", philo->id, get_bool(&philo->philo_mutex, philo->alive), get_bool(&philo->table->table_mutex, philo->table->ended_sim)); // debug
         handle_mutex(&print, UNLOCK);
