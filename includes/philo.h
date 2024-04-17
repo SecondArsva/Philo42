@@ -131,5 +131,12 @@ typedef enum	e_handle_forks
 	RELEASE,
 }				t_handle_forks;
 
+typedef enum	e_free
+{
+	PHILO,
+	FORK,
+	ALL
+}				t_free;
+
 //			### FUNCTIONS BY FILES ###
 #endif

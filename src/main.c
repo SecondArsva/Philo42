@@ -4,7 +4,8 @@
 
 // #--- Utilidades ---#
 
-void    error_exit(char *text);
+// void    error_exit(char *text); // Esto es ilegalísimo.
+void    custom_free(t_table *table, char *text, t_free opcode);
 void    correct(char *text);
 long    simple_atol(char *str);
 void    *safe_malloc(size_t bytes);
@@ -17,15 +18,15 @@ void    print_debug(t_table *table, char *text);
 
 // #--- Parseo ---#      Listo, no toques nada del parseo.
 
-void    parse_input(char **argv);
-void    all_digit(char **argv);
+int     parse_input(char **argv);
+int     all_digit(char **argv);
 int     is_digit(char c);
-void    valid_digit(char **argv);
+int     valid_digit(char **argv);
 
 // #--- Inicialización de datos ---# Listo, no toques nada de la inicialización.
 
-void    init_data(int argc, char **argv, t_table *table);
-void    init_table(int argc, char **argv, t_table *table);
+int     init_data(int argc, char **argv, t_table *table);
+int     init_table(int argc, char **argv, t_table *table);
 void    catch_args(int argc, char **argv, t_table *table);
 void    init_forks(t_table *table);
 void    init_philos(t_table *table);
@@ -116,13 +117,19 @@ acaceres ha dado con el error del "Illegal Hardware Instruction" y es que result
 de los mutexex de los philos y los forks tenía "<=" y con esto el iterador sobrepasaba el número de slots de ambos arrays y
 trataba de liberar algo fuera del array. Recuerda que el iterador inicia en 0 y el philo_nbr lo hace desde 1. Por ello la
 iteración deberá hacerse siempre y cuando el iterador sea menor a philo_nbr.
+
+exit es una función no autorizada para la parte base del proyecto, por lo que he de hacer las correspondientes
+liberaciones de memoria asignada con free. Hecho.
+
+17/4 acabo de cambiar los "error_exit" por una gestíon de errores autorizada y me da "Aborted" al crear 87 comensales.
 */
 
 //# FALLOS A ULTIMAR #
 // TODO Siguen saliendo printeos tras la muerte de un philo
 // TODO al finalizar el programa, bien sea por la muerte de un philo o porque todos los philos hayan terminado de comer, me sale
 // "zsh: illegal hardware instruction" y los argumentos introducidos ./philo 5 1000 470 470 2
-// En bash me sale "Illegal instruction: 4".
+// En bash me sale "Illegal instruction: 4". Estaba destruyendo mutexex inexistentes. Solved. Ty, acaceres.
+
 
 // my safe usleep for the waitings while eating or sleeping
 void    *secured_nap(t_philo *philo, long milli)
@@ -184,7 +191,7 @@ void    print_status(t_philo *philo, t_print opcode)
         else if (opcode == SECOND_FORK)
             printf("%s%li %li has taken a fork\n", CY, elapsed_time(table), philo->id);
         else
-            error_exit("Wrong opcode on print_status function");
+            return ;
         printf("%s", CW);
         //printf("philo %li - alive: %i | ended_sim: %i\n", philo->id, get_bool(&philo->philo_mutex, philo->alive), get_bool(&philo->table->table_mutex, philo->table->ended_sim)); // debug
         handle_mutex(&print, UNLOCK);
@@ -254,8 +261,7 @@ long    get_time(t_time_units opcode)
 {
     struct timeval tv;
 
-    if (gettimeofday(&tv, NULL) == -1)
-		error_exit("Gettimeofday failed");
+    gettimeofday(&tv, NULL);
     if (opcode == SECONDS)
         return (tv.tv_sec + tv.tv_usec / 1e6);
     else if(opcode == MICROSECONDS)
@@ -263,7 +269,7 @@ long    get_time(t_time_units opcode)
     else if (opcode == MILLISECONDS)
         return ((tv.tv_sec * 1e3) + (tv.tv_usec / 1e3));
     else
-        error_exit("Wrong opcode on get_time function");
+        return ((long)"fool_return");
     return ((long)"fool_return");
 }
 
@@ -506,7 +512,7 @@ void    handle_forks(t_philo *philo, t_handle_forks opcode)
         handle_mutex(&philo->second_fork->fork, UNLOCK);
     }
     else
-        error_exit("Wrong opcode on handle_forks function");
+        return ;
 }
 
 /* Pilla tenedores, espera a terminar de comer, actualizo last_meal_time, suelta tenedores.
@@ -775,7 +781,7 @@ void    handle_threads(pthread_t *th, void *(*routine)(void *), void *arg, t_pth
     else if (opcode == JOIN)
         pthread_join(*th, NULL);
     else
-        error_exit("Wrong opcode on handle_threads function");
+        return ;
 }
 
 bool    get_bool(t_mutex *mutex, bool value)
@@ -855,7 +861,7 @@ void    handle_mutex(t_mutex *mutex, t_pthread opcode)
     else if (opcode == DESTROY)
         pthread_mutex_destroy(mutex);
     else
-        error_exit("Wrong opcode on handle_mutex function");
+        return ;
 }
 /*
 void    handle_threads(pthread_t *thread, void *(*routine)(void *), void *arg  t_pthread opcode)
@@ -883,7 +889,7 @@ void    catch_args(int argc, char **argv, t_table *table)
         table->must_eat = simple_atol(argv[5]);
 }
 
-void    init_table(int argc, char **argv, t_table *table)
+int init_table(int argc, char **argv, t_table *table)
 {
     catch_args(argc, argv, table);
     table->sim_start_chrono = 0;
@@ -894,7 +900,18 @@ void    init_table(int argc, char **argv, t_table *table)
     handle_mutex(&table->table_mutex, INIT);
     handle_mutex(&table->print_mutex, INIT);
     table->philos = safe_malloc(sizeof(t_philo) * table->philo_nbr);
+    if (table->philos == NULL)
+    {
+        custom_free(table, "fallo en la reserva del array de philo", PHILO);
+        return (0);
+    }
     table->forks = safe_malloc(sizeof(t_fork) * table->philo_nbr);
+    if (table->forks == NULL)
+    {
+        custom_free(table, "fallo en la reserva del array de forks", FORK);
+        return (0);
+    }
+    return (1);
 }
 
 void    init_forks(t_table *table)
@@ -1020,11 +1037,13 @@ void    print_philos(t_table *table, t_philo *philos)
     }
 }
 
-void    init_data(int argc, char **argv, t_table *table)
+int init_data(int argc, char **argv, t_table *table)
 {
-    init_table(argc, argv, table);
+    if (init_table(argc, argv, table) == 0)
+        return (0);
     init_forks(table);
     init_philos(table);
+    return (1);
 }
 
 void    *safe_malloc(size_t size)
@@ -1033,7 +1052,10 @@ void    *safe_malloc(size_t size)
 
     reserve = malloc(size);
     if (!reserve)
-        error_exit("Error with the memory allocation");
+    {
+        printf("philo: ERROR: %s.\n", "Error with the memory allocation");
+        return (NULL);
+    }
     return (reserve);
 }
 
@@ -1060,7 +1082,7 @@ long    simple_atol(char *str)
 // 5 500 100 100 5
 // 'p' y 'm' han de ser mayores a 0. 'd', 'e' y 's' mayores de 60 ya que representan milisegundos.
 // No pueden ser mayores al INT_MAX.
-void    valid_digit(char **argv)
+int valid_digit(char **argv)
 {
     int i;
     long digit;
@@ -1071,18 +1093,19 @@ void    valid_digit(char **argv)
     {
         digit = simple_atol(argv[i]);
         if (digit > INT_MAX)
-            error_exit("Los valores introducidos no pueden superar el INT_MAX");
+            return (printf("philo: %s.\n", "Los valores introducidos no pueden superar el INT_MAX"), 0);
         else if ((i == 1 || i == 5) && digit >= 1)
             i++;
         else if((i >= 2 && i <= 4) && digit >= 60)
             i++;
         else
-            error_exit("Los valores introducidos no pueden ser menores al ejemplo: ./philo 1 60 60 60 1");
+            return (printf("philo: %s.\n", "Los valores introducidos no pueden ser menores al ejemplo: ./philo 1 60 60 60 1"), 0);
     }
+    return (1);
     //correct("Bien, los argumentos introducidos son mayores al ejemplo: ./philo 1 60 60 60 1");
 }
 
-void    all_digit(char **argv)
+int all_digit(char **argv)
 {
     int i;
     int j;
@@ -1100,11 +1123,12 @@ void    all_digit(char **argv)
                 j++;
             }
             else
-                error_exit("Los argumentos solo pueden componerse de números");
+                return (printf("philo: %s.\n", "Los argumentos solo pueden componerse de números"), 0);
         }
         j = 0;
         i++;
     }
+    return (1);
     //correct("Todos los argumentos son numéricos");
 }
 
@@ -1116,10 +1140,13 @@ int is_digit(char c)
         return (0);
 }
 
-void    parse_input(char **argv)
+int parse_input(char **argv)
 {
-    all_digit(argv);
-    valid_digit(argv);
+    if (all_digit(argv) == 0)
+        return (0);
+    if (valid_digit(argv) == 0)
+        return (0);
+    return (1);
 }
 
 // Printea los argumentos en caso de ser 5 o 6. NO ENTREGAR EN EL PROYECTO FINAL.
@@ -1144,10 +1171,22 @@ void    correct(char *text)
 }
 
 // Mata el programa en caso de error.
+// Esto es ilegalísimo.
 void    error_exit(char *text)
 {
     printf("philo: ERROR: %s.\n", text);
     exit(EXIT_FAILURE);
+}
+
+void    custom_free(t_table *table, char *text, t_free opcode)
+{
+    if (opcode == ALL)
+        free(table->forks);
+    if (opcode == FORK || opcode == ALL)
+        free(table->philos);
+    if (opcode == PHILO || opcode == FORK || opcode == ALL)
+        free(table);
+    printf("philo: ERROR: %s.\n", text);
 }
 
 // El main, amigo...
@@ -1158,14 +1197,18 @@ int main(int argc, char **argv)
     if (argc == 5 || argc == 6)
     {
         //print_args(argc, argv);
-        parse_input(argv);
+        if (parse_input(argv) == 0)
+            return (0);
         table = safe_malloc(sizeof(t_table) * 1);
-        init_data(argc, argv, table);
+        if (table == NULL)
+            return (printf("philo: ERROR: %s.\n", "fallo en la reserva de t_table"), 0);
+        if (init_data(argc, argv, table) == 0)
+            return (0);
         //print_data(table);
         simulation(table); // Crear simulación. Diseñar como iría. Crear hilos comensales y segador.
         clear_data(table);
     }
     else
-        error_exit("Total de argumentos incorrectos. Han de ser 5 o 6");
-    return (0);
+        printf("philo: ERROR: %s.\n", "Total de argumentos incorrectos. Han de ser 5 o 6");
+    return (1);
 }
